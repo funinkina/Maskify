@@ -30,6 +30,7 @@ if (!fs.existsSync("uploads")) {
 // Endpoint to upload a file and process it
 app.post("/process-file", upload.single("file"), (req, res) => {
   const inputFilePath = req.file.path;
+  console.log("inputFilePath", inputFilePath);
   const redactionLevel = req.body.level;
 
   const python = spawn("python", [
@@ -49,10 +50,13 @@ app.post("/process-file", upload.single("file"), (req, res) => {
   });
 
   python.on("close", (code) => {
-    const outputFilePath = inputFilePath.replace(
+    let outputFilePath = inputFilePath.replace(
       path.extname(req.file.originalname),
       "_masked.jpg"
     );
+    console.log("outputFilePath", outputFilePath);
+    outputFilePath = outputFilePath.replace("uploads\\", "");
+    console.log("outputFilePath", outputFilePath);
 
     if (code !== 0) {
       // Ensure only one response is sent
