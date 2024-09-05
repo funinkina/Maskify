@@ -2,3 +2,4 @@ node_modules
 dist
 .vercel
 uploads
+vercel.json
