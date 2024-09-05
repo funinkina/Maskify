@@ -1,0 +1,7 @@
+opencv-python
+numpy
+regex
+pillow
+pytesseract
+pdf2image
+img2pdf
