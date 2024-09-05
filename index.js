@@ -5,7 +5,7 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
-const port = 3000;
+const port = 3002;
 
 // Middleware to parse URL-encoded bodies (e.g., form data)
 app.use(express.urlencoded({ extended: true }));
