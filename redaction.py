@@ -1,3 +1,5 @@
+import sys
+print("Python version:", sys.version)
 import cv2
 import numpy as np
 import regex as re
@@ -5,7 +7,7 @@ from PIL import Image
 import pytesseract as ocr
 from pdf2image import convert_from_path
 import img2pdf
-import sys
+# import sys
 import io
 
 # Verhoeff Algorithm to verify UID

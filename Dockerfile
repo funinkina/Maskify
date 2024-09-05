@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN python3 -m pip install --upgrade pip
 
+ENV PATH /usr/local/bin:$PATH
+
 # Set the working directory
 WORKDIR /usr/src/app
 
