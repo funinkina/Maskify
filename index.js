@@ -29,10 +29,9 @@ if (!fs.existsSync("uploads")) {
 
 // Endpoint to upload a file and process it
 app.post("/process-file", upload.single("file"), (req, res) => {
-  //get redaction level from the request and the file path
   const inputFilePath = req.file.path;
   const redactionLevel = req.body.level;
-  // Call the Python script with the input file path and redaction level
+
   const python = spawn("python", [
     path.join(__dirname, "redaction.py"),
     inputFilePath,
@@ -56,15 +55,23 @@ app.post("/process-file", upload.single("file"), (req, res) => {
     );
 
     if (code !== 0) {
-      return res.status(500).send("Error processing file");
+      // Ensure only one response is sent
+      if (!res.headersSent) {
+        return res.status(500).send("Error processing file");
+      }
+      return;
     }
 
     // Ensure the output file exists before sending it
     fs.access(outputFilePath, fs.constants.F_OK, (err) => {
       if (err) {
-        return res
-          .status(500)
-          .send("Redaction Failed Output File not generated");
+        // Ensure only one response is sent
+        if (!res.headersSent) {
+          return res
+            .status(500)
+            .send("Redaction Failed Output File not generated");
+        }
+        return;
       }
 
       // Send the processed file back to the client
@@ -72,7 +79,7 @@ app.post("/process-file", upload.single("file"), (req, res) => {
         if (err) {
           console.error("Error sending file:", err);
         }
-        // Clean up files
+        // Clean up files after sending response
         fs.unlink(inputFilePath, (err) => {
           if (err) console.error("Error deleting input file:", err);
         });
@@ -84,7 +91,10 @@ app.post("/process-file", upload.single("file"), (req, res) => {
   });
 
   python.on("error", (err) => {
-    res.status(500).send("Failed to start Python script");
+    // Ensure only one response is sent
+    if (!res.headersSent) {
+      res.status(500).send("Failed to start Python script");
+    }
   });
 });
 
