@@ -55,7 +55,7 @@ app.post("/process-file", upload.single("file"), (req, res) => {
       "_masked.jpg"
     );
     console.log("outputFilePath", outputFilePath);
-    outputFilePath = outputFilePath.replace("uploads\\", "");
+    outputFilePath = outputFilePath.replace("uploads/", "");
     console.log("outputFilePath", outputFilePath);
 
     if (code !== 0) {
