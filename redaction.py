@@ -241,7 +241,7 @@ def redact(input_path, level):
         file.close()
 
     if masked_img is None:
-        return "Can't find any UID!"
+        print("Can't find any UID!")
     else:
         print("Found UIDs : " + str(possible_UIDs[:, 0]))
 

@@ -29,17 +29,18 @@ if (!fs.existsSync("uploads")) {
 
 // Endpoint to upload a file and process it
 app.post("/process-file", upload.single("file"), (req, res) => {
+  //get redaction level from the request and the file path
   const inputFilePath = req.file.path;
-  const redactionLevel = req.body.level; // Get redaction level from request body
-
+  const redactionLevel = req.body.level;
   // Call the Python script with the input file path and redaction level
   const python = spawn("python", [
     path.join(__dirname, "redaction.py"),
     inputFilePath,
-    redactionLevel, // Pass redaction level as an argument
+    redactionLevel,
   ]);
 
   python.on("close", (code) => {
+    console.log(`Python script exited with code ${code}`);
     const outputFilePath = inputFilePath.replace(
       path.extname(req.file.originalname),
       "_masked.jpg"
