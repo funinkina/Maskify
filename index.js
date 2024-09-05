@@ -39,8 +39,17 @@ app.post("/process-file", upload.single("file"), (req, res) => {
     redactionLevel,
   ]);
 
+  // Capture stdout (standard output)
+  python.stdout.on("data", (data) => {
+    console.log(`stdout: ${data}`);
+  });
+
+  // Capture stderr (standard error)
+  python.stderr.on("data", (data) => {
+    console.error(`stderr: ${data}`);
+  });
+
   python.on("close", (code) => {
-    console.log(`Python script exited with code ${code}`);
     const outputFilePath = inputFilePath.replace(
       path.extname(req.file.originalname),
       "_masked.jpg"
