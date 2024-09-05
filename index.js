@@ -29,9 +29,10 @@ if (!fs.existsSync("uploads")) {
 
 // Endpoint to upload a file and process it
 app.post("/process-file", upload.single("file"), (req, res) => {
+  //get redaction level from the request and the file path
   const inputFilePath = req.file.path;
   const redactionLevel = req.body.level;
-
+  // Call the Python script with the input file path and redaction level
   const python = spawn("python", [
     path.join(__dirname, "redaction.py"),
     inputFilePath,
@@ -55,23 +56,15 @@ app.post("/process-file", upload.single("file"), (req, res) => {
     );
 
     if (code !== 0) {
-      // Ensure only one response is sent
-      if (!res.headersSent) {
-        return res.status(500).send("Error processing file");
-      }
-      return;
+      return res.status(500).send("Error processing file");
     }
 
     // Ensure the output file exists before sending it
     fs.access(outputFilePath, fs.constants.F_OK, (err) => {
       if (err) {
-        // Ensure only one response is sent
-        if (!res.headersSent) {
-          return res
-            .status(500)
-            .send("Redaction Failed Output File not generated");
-        }
-        return;
+        return res
+          .status(500)
+          .send("Redaction Failed Output File not generated");
       }
 
       // Send the processed file back to the client
@@ -79,7 +72,7 @@ app.post("/process-file", upload.single("file"), (req, res) => {
         if (err) {
           console.error("Error sending file:", err);
         }
-        // Clean up files after sending response
+        // Clean up files
         fs.unlink(inputFilePath, (err) => {
           if (err) console.error("Error deleting input file:", err);
         });
@@ -91,10 +84,7 @@ app.post("/process-file", upload.single("file"), (req, res) => {
   });
 
   python.on("error", (err) => {
-    // Ensure only one response is sent
-    if (!res.headersSent) {
-      res.status(500).send("Failed to start Python script");
-    }
+    res.status(500).send("Failed to start Python script");
   });
 });
 
