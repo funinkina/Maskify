@@ -50,12 +50,24 @@ app.post("/process-file", upload.single("file"), (req, res) => {
   });
 
   python.on("close", (code) => {
-    let outputFilePath = inputFilePath.replace(
-      path.extname(req.file.originalname),
-      "_masked.jpg"
-    );
-    console.log("outputFilePath", outputFilePath);
-    outputFilePath = outputFilePath.replace("uploads/", "");
+    let outputFilePath;
+    if (path.extname(inputFilePath) === ".pdf") {
+      outputFilePath = inputFilePath.replace(
+        path.extname(req.file.originalname),
+        "_masked.pdf"
+      );
+    }
+    if (path.extname(inputFilePath) === ".jpg") {
+      outputFilePath = inputFilePath.replace(
+        path.extname(req.file.originalname),
+        "_masked.jpg"
+      );
+    }
+    if(path.extname(inputFilePath) === ".jpg"){
+          outputFilePath = outputFilePath.replace("uploads/", "");
+    }
+    // console.log("outputFilePath", outputFilePath);
+    // outputFilePath = outputFilePath.replace("uploads/", "");
     console.log("outputFilePath", outputFilePath);
 
     if (code !== 0) {
@@ -84,6 +96,12 @@ app.post("/process-file", upload.single("file"), (req, res) => {
           console.error("Error sending file:", err);
         }
         // Clean up files after sending response
+        fs.unlink("./pdf2img_masked.jpg", (err) => {
+          if (err) console.error("Error deleting file:", err);
+        });
+        fs.unlink("./pdf2img.jpg", (err) => {
+          if (err) console.error("Error deleting file:", err);
+        });
         fs.unlink(inputFilePath, (err) => {
           if (err) console.error("Error deleting input file:", err);
         });
