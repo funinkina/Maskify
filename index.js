@@ -63,8 +63,8 @@ app.post("/process-file", upload.single("file"), (req, res) => {
         "_masked.jpg"
       );
     }
-    if(path.extname(inputFilePath) === ".jpg"){
-          outputFilePath = outputFilePath.replace("uploads/", "");
+    if (path.extname(inputFilePath) === ".jpg") {
+      outputFilePath = outputFilePath.replace("uploads/", "");
     }
     // console.log("outputFilePath", outputFilePath);
     // outputFilePath = outputFilePath.replace("uploads/", "");
@@ -115,7 +115,7 @@ app.post("/process-file", upload.single("file"), (req, res) => {
   python.on("error", (err) => {
     // Ensure only one response is sent
     if (!res.headersSent) {
-      res.status(500).send("Failed to start Python script");
+      res.status(500).send("Failed to start Python script", err);
     }
   });
 });
