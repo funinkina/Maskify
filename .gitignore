@@ -1,5 +1,8 @@
-node_modules
-dist
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+venv/
+.venv/
 .vercel
-uploads
-vercel.json
+.DS_Store

@@ -1,5 +1,7 @@
+import os
 import sys
-print("Python version:", sys.version)
+import io
+
 import cv2
 import numpy as np
 import regex as re
@@ -7,8 +9,6 @@ from PIL import Image
 import pytesseract as ocr
 from pdf2image import convert_from_path
 import img2pdf
-# import sys
-import io
 
 # Verhoeff Algorithm to verify UID
 
@@ -81,7 +81,7 @@ def Regex_Search(bounding_boxes):
 
 
 def Mask_UIDs(
-    image_path, possible_UIDs, bounding_boxes, rtype, SR=False, SR_Ratio=[1, 1]
+    image_path, possible_UIDs, bounding_boxes, rtype, work_dir=".", SR=False, SR_Ratio=[1, 1]
 ):
     img = cv2.imread(image_path)
 
@@ -154,17 +154,17 @@ def Mask_UIDs(
     elif rtype == 4:
         img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-    file_name = (
-        image_path.split("/")[-1].split(".")[0] + "_masked" + "." + image_path.split(".")[-1]
-    )
-    cv2.imwrite(file_name, img)
-    return file_name
+    base = os.path.splitext(os.path.basename(image_path))
+    file_name = base[0] + "_masked" + base[1]
+    output_path = os.path.join(work_dir, file_name)
+    cv2.imwrite(output_path, img)
+    return output_path
 
 
 # Extract, Verify and Mask UIDs
 
 
-def Extract_and_Mask_UIDs(image_path, SR=False, sr_image_path=None, SR_Ratio=[1, 1]):
+def Extract_and_Mask_UIDs(image_path, work_dir=".", SR=False, sr_image_path=None, SR_Ratio=[1, 1]):
     if SR is False:
         img = cv2.imread(image_path)
     else:
@@ -206,7 +206,7 @@ def Extract_and_Mask_UIDs(image_path, SR=False, sr_image_path=None, SR_Ratio=[1,
         else:
             if SR is False:
                 masked_img = Mask_UIDs(
-                    image_path, possible_UIDs, bounding_boxes, rotation[1]
+                    image_path, possible_UIDs, bounding_boxes, rotation[1], work_dir
                 )
             else:
                 masked_img = Mask_UIDs(
@@ -214,6 +214,7 @@ def Extract_and_Mask_UIDs(image_path, SR=False, sr_image_path=None, SR_Ratio=[1,
                     possible_UIDs,
                     bounding_boxes,
                     rotation[1],
+                    work_dir,
                     True,
                     SR_Ratio,
                 )
@@ -221,32 +222,36 @@ def Extract_and_Mask_UIDs(image_path, SR=False, sr_image_path=None, SR_Ratio=[1,
     return (None, None)
 
 
-def redact(input_path, level):
-    if input_path.split(".")[-1] == "pdf":
+def redact(input_path, level, work_dir="."):
+    ext = os.path.splitext(input_path)[1].lower()
+    is_pdf = ext == ".pdf"
 
+    if is_pdf:
         pages = convert_from_path(input_path, 300)
-        pages[0].save("pdf2img.jpg", "JPEG")
-
-    if input_path.split(".")[-1] == "pdf":
-        masked_img, possible_UIDs = Extract_and_Mask_UIDs("pdf2img.jpg")
+        temp_img = os.path.join(work_dir, "pdf2img.jpg")
+        pages[0].save(temp_img, "JPEG")
+        masked_img, possible_UIDs = Extract_and_Mask_UIDs(temp_img, work_dir)
     else:
-        masked_img, possible_UIDs = Extract_and_Mask_UIDs(input_path)
+        masked_img, possible_UIDs = Extract_and_Mask_UIDs(input_path, work_dir)
 
-    if masked_img is not None and input_path.split(".")[-1] == "pdf":
-
+    if masked_img is not None and is_pdf:
         image = Image.open(masked_img)
         pdf_bytes = img2pdf.convert(image.filename)
-        file = open(input_path.split("/ ")[-1].split(".")[0] + "_masked" + ".pdf", "wb")
-        masked_img = input_path.split("/")[-1].split(".")[0] + "_masked" + ".pdf"
-        file.write(pdf_bytes)
+        base = os.path.splitext(os.path.basename(input_path))[0]
+        output_pdf = os.path.join(work_dir, base + "_masked.pdf")
+        with open(output_pdf, "wb") as f:
+            f.write(pdf_bytes)
         image.close()
-        file.close()
+        masked_img = output_pdf
 
-    if masked_img is None:
-        print("Can't find any UID!")
-    else:
-        print("Found UIDs : " + str(possible_UIDs[:, 0]))
+    return masked_img
 
 
 if __name__ == "__main__":
-    redact(sys.argv[1], sys.argv[2])
+    import tempfile
+    work_dir = tempfile.mkdtemp()
+    result = redact(sys.argv[1], sys.argv[2], work_dir)
+    if result:
+        print("Output:", result)
+    else:
+        print("Can't find any UID!")
