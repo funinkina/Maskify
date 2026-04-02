@@ -6,3 +6,4 @@ venv/
 .venv/
 .vercel
 .DS_Store
+audit.log

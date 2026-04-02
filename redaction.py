@@ -3,86 +3,41 @@ import sys
 import io
 
 import cv2
-import numpy as np
-import regex as re
 from PIL import Image
 import pytesseract as ocr
 from pdf2image import convert_from_path
 import img2pdf
 
-# Verhoeff Algorithm to verify UID
-
-multiplication_table = (
-    (0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
-    (1, 2, 3, 4, 0, 6, 7, 8, 9, 5),
-    (2, 3, 4, 0, 1, 7, 8, 9, 5, 6),
-    (3, 4, 0, 1, 2, 8, 9, 5, 6, 7),
-    (4, 0, 1, 2, 3, 9, 5, 6, 7, 8),
-    (5, 9, 8, 7, 6, 0, 4, 3, 2, 1),
-    (6, 5, 9, 8, 7, 1, 0, 4, 3, 2),
-    (7, 6, 5, 9, 8, 2, 1, 0, 4, 3),
-    (8, 7, 6, 5, 9, 3, 2, 1, 0, 4),
-    (9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
-)
-
-permutation_table = (
-    (0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
-    (1, 5, 7, 6, 2, 8, 3, 0, 9, 4),
-    (5, 8, 0, 3, 7, 9, 6, 1, 4, 2),
-    (8, 9, 1, 6, 0, 4, 3, 5, 2, 7),
-    (9, 4, 5, 3, 1, 2, 6, 8, 7, 0),
-    (4, 2, 8, 6, 5, 7, 3, 9, 0, 1),
-    (2, 7, 9, 3, 8, 0, 6, 4, 1, 5),
-    (7, 0, 4, 6, 9, 1, 3, 2, 5, 8),
-)
-
-
-def compute_checksum(number):
-    """Calculate the Verhoeff checksum over the provided number. The checksum
-    is returned as an int. Valid numbers should have a checksum of 0."""
-
-    # transform number list
-    number = tuple(int(n) for n in reversed(str(number)))
-
-    # calculate checksum
-    checksum = 0
-
-    for i, n in enumerate(number):
-        checksum = multiplication_table[checksum][permutation_table[i % 8][n]]
-
-    return checksum
+from detectors import detect_all_pii, get_mask_range
 
 
 def Regex_Search(bounding_boxes):
-    possible_UIDs = []
-    Result = ""
-
+    """Reconstruct text from OCR bounding boxes and detect all PII types."""
+    text = ""
     for character in range(len(bounding_boxes)):
         if len(bounding_boxes[character]) != 0:
-            Result += bounding_boxes[character][0]
+            text += bounding_boxes[character][0]
         else:
-            Result += "?"
+            text += "?"
 
-    matches = [
-        match.span() for match in re.finditer(r"\d{12}", Result, overlapped=True)
-    ]
+    detections = detect_all_pii(text)
 
-    for match in matches:
-        UID = int(Result[match[0]: match[1]])
-
-        if compute_checksum(UID) == 0 and UID % 10000 != 1947:
-            possible_UIDs.append([UID, match[0]])
-
-    possible_UIDs = np.array(possible_UIDs)
-    return possible_UIDs
-
-
-# Mask found UIDs using OpenCV
+    # Convert to array format compatible with masking: [detection_dict, ...]
+    # Each detection already has start/end positions mapping to bounding_boxes indices
+    return detections
 
 
 def Mask_UIDs(
-    image_path, possible_UIDs, bounding_boxes, rtype, work_dir=".", SR=False, SR_Ratio=[1, 1]
+    image_path,
+    detections,
+    bounding_boxes,
+    rtype,
+    level="standard",
+    work_dir=".",
+    SR=False,
+    SR_Ratio=[1, 1],
 ):
+    """Mask detected PII regions on the image."""
     img = cv2.imread(image_path)
 
     if rtype == 2:
@@ -97,18 +52,22 @@ def Mask_UIDs(
     if SR is True:
         height *= SR_Ratio[1]
 
-    # MASK EVERY DIGIT INDIVIDUALLY
+    for detection in detections:
+        mask_start, mask_end = get_mask_range(detection, level)
+        char_start = detection["start"]
 
-    for UID in possible_UIDs:
+        for i in range(mask_start, mask_end):
+            box_idx = char_start + i
+            if box_idx >= len(bounding_boxes):
+                break
 
-        for i in range(8):
-
-            digit = bounding_boxes[UID[1] + i].split()
+            digit = bounding_boxes[box_idx].split()
+            if len(digit) < 5:
+                continue
 
             if SR is False:
                 top_left_corner = (int(digit[1]), height - int(digit[4]))
                 bottom_right_corner = (int(digit[3]), height - int(digit[2]))
-
             else:
                 top_left_corner = (
                     int(int(digit[1]) / SR_Ratio[0]),
@@ -122,30 +81,6 @@ def Mask_UIDs(
             img = cv2.rectangle(
                 img, top_left_corner, bottom_right_corner, (0, 0, 0), -1
             )
-
-    # for UID in possible_UIDs:
-
-    #     digit1 = bounding_boxes[UID[1]].split()
-    #     digit8 = bounding_boxes[UID[1] + 7].split()
-
-    #     h1 = min(height - int(digit1[4]), height - int(digit8[4]))
-    #     h2 = max(height - int(digit1[2]), height - int(digit8[2]))
-
-    #     if SR is False:
-    #         top_left_corner = (int(digit1[1]), h1)
-    #         bottom_right_corner = (int(digit8[3]), h2)
-
-    #     else:
-    #         top_left_corner = (
-    #             int(int(digit1[1]) / SR_Ratio[0]),
-    #             int((h1) / SR_Ratio[1]),
-    #         )
-    #         bottom_right_corner = (
-    #             int(int(digit8[3]) / SR_Ratio[0]),
-    #             int((h2) / SR_Ratio[1]),
-    #         )
-
-    #     img = cv2.rectangle(img, top_left_corner, bottom_right_corner, (0, 0, 0), -1)
 
     if rtype == 2:
         img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
@@ -161,10 +96,15 @@ def Mask_UIDs(
     return output_path
 
 
-# Extract, Verify and Mask UIDs
-
-
-def Extract_and_Mask_UIDs(image_path, work_dir=".", SR=False, sr_image_path=None, SR_Ratio=[1, 1]):
+def Extract_and_Mask_UIDs(
+    image_path,
+    work_dir=".",
+    level="standard",
+    SR=False,
+    sr_image_path=None,
+    SR_Ratio=[1, 1],
+):
+    """Try 8 orientations (4 rotations x 2 blur states) to detect and mask PII."""
     if SR is False:
         img = cv2.imread(image_path)
     else:
@@ -191,67 +131,134 @@ def Extract_and_Mask_UIDs(image_path, work_dir=".", SR=False, sr_image_path=None
     settings = "-l eng --oem 3 --psm 11"
 
     for rotation in rotations:
-        # cv2.imwrite("rotated_grayscale.png", rotation[0])
-        # bounding_boxes = ocr.image_to_boxes(
-        #     Image.open("rotated_grayscale.png"), config=settings
-        # ).split(" 0\n")
-        _, img_encoded = cv2.imencode('.png', rotation[0])
+        _, img_encoded = cv2.imencode(".png", rotation[0])
         img_bytes = io.BytesIO(img_encoded)
         image = Image.open(img_bytes)
         bounding_boxes = ocr.image_to_boxes(image, config=settings).split(" 0\n")
-        possible_UIDs = Regex_Search(bounding_boxes)
+        detections = Regex_Search(bounding_boxes)
 
-        if len(possible_UIDs) == 0:
+        if len(detections) == 0:
             continue
+
+        if SR is False:
+            masked_img = Mask_UIDs(
+                image_path, detections, bounding_boxes, rotation[1], level, work_dir
+            )
         else:
-            if SR is False:
-                masked_img = Mask_UIDs(
-                    image_path, possible_UIDs, bounding_boxes, rotation[1], work_dir
-                )
-            else:
-                masked_img = Mask_UIDs(
-                    image_path,
-                    possible_UIDs,
-                    bounding_boxes,
-                    rotation[1],
-                    work_dir,
-                    True,
-                    SR_Ratio,
-                )
-            return (masked_img, possible_UIDs)
-    return (None, None)
+            masked_img = Mask_UIDs(
+                image_path,
+                detections,
+                bounding_boxes,
+                rotation[1],
+                level,
+                work_dir,
+                True,
+                SR_Ratio,
+            )
+        return (masked_img, detections)
+
+    return (None, [])
+
+
+def _mask_value(detection, level):
+    """Return a masked representation of the detected value for stats."""
+    value = detection["value"]
+    mask_start, mask_end = get_mask_range(detection, level)
+    chars = list(value)
+    for i in range(mask_start, mask_end):
+        chars[i] = "X"
+    return "".join(chars)
 
 
 def redact(input_path, level, work_dir="."):
+    """Main entry point. Processes PDF (all pages) or images.
+
+    Returns (output_path_or_None, stats_dict).
+    """
     ext = os.path.splitext(input_path)[1].lower()
     is_pdf = ext == ".pdf"
 
+    stats = {
+        "total_detections": 0,
+        "by_type": {"aadhaar": 0, "pan": 0, "payment_card": 0},
+        "pages_processed": 0,
+        "detections": [],
+    }
+
     if is_pdf:
         pages = convert_from_path(input_path, 300)
-        temp_img = os.path.join(work_dir, "pdf2img.jpg")
-        pages[0].save(temp_img, "JPEG")
-        masked_img, possible_UIDs = Extract_and_Mask_UIDs(temp_img, work_dir)
-    else:
-        masked_img, possible_UIDs = Extract_and_Mask_UIDs(input_path, work_dir)
+        stats["pages_processed"] = len(pages)
+        masked_page_paths = []
 
-    if masked_img is not None and is_pdf:
-        image = Image.open(masked_img)
-        pdf_bytes = img2pdf.convert(image.filename)
+        for page_num, page in enumerate(pages, start=1):
+            temp_img = os.path.join(work_dir, f"page_{page_num}.jpg")
+            page.save(temp_img, "JPEG")
+            masked_img, detections = Extract_and_Mask_UIDs(temp_img, work_dir, level)
+
+            if masked_img is not None:
+                masked_page_paths.append(masked_img)
+                for det in detections:
+                    stats["total_detections"] += 1
+                    stats["by_type"][det["type"]] = (
+                        stats["by_type"].get(det["type"], 0) + 1
+                    )
+                    stats["detections"].append(
+                        {
+                            "type": det["type"],
+                            "masked_value": _mask_value(det, level),
+                            "page": page_num,
+                        }
+                    )
+            else:
+                # No detections on this page — keep original
+                masked_page_paths.append(temp_img)
+
+        if stats["total_detections"] == 0:
+            return (None, stats)
+
+        # Combine all pages into a single PDF
+        image_paths = []
+        for p in masked_page_paths:
+            img = Image.open(p)
+            image_paths.append(img.filename)
+            img.close()
+
+        pdf_bytes = img2pdf.convert(masked_page_paths)
         base = os.path.splitext(os.path.basename(input_path))[0]
         output_pdf = os.path.join(work_dir, base + "_masked.pdf")
         with open(output_pdf, "wb") as f:
             f.write(pdf_bytes)
-        image.close()
-        masked_img = output_pdf
+        return (output_pdf, stats)
 
-    return masked_img
+    else:
+        # Image file (JPG, JPEG, PNG)
+        stats["pages_processed"] = 1
+        masked_img, detections = Extract_and_Mask_UIDs(input_path, work_dir, level)
+
+        if masked_img is not None:
+            for det in detections:
+                stats["total_detections"] += 1
+                stats["by_type"][det["type"]] = stats["by_type"].get(det["type"], 0) + 1
+                stats["detections"].append(
+                    {
+                        "type": det["type"],
+                        "masked_value": _mask_value(det, level),
+                        "page": 1,
+                    }
+                )
+
+        return (masked_img, stats)
 
 
 if __name__ == "__main__":
     import tempfile
+
     work_dir = tempfile.mkdtemp()
-    result = redact(sys.argv[1], sys.argv[2], work_dir)
-    if result:
-        print("Output:", result)
+    result_path, stats = redact(
+        sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "standard", work_dir
+    )
+    if result_path:
+        print("Output:", result_path)
+        print("Stats:", stats)
     else:
-        print("Can't find any UID!")
+        print("Can't find any PII!")

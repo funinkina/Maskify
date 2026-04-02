@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RE-DACT</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1 class="brand">RE<span class="brand-dot">-</span>DACT</h1>
+        <p class="subtitle">AI-Driven Sensitive Information Redaction</p>
+    </header>
+
+    <main>
+        <section class="upload-section">
+            <div class="upload-zone" id="dropZone">
+                <div class="upload-icon">[+]</div>
+                <p>Drop a file here, or click to browse</p>
+                <p class="upload-hint">PDF / JPG / JPEG / PNG</p>
+                <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" hidden>
+            </div>
+
+            <div class="file-info" id="fileInfo" hidden>
+                <div class="file-meta">
+                    <span class="file-name" id="fileName"></span>
+                    <span class="file-size" id="fileSize"></span>
+                </div>
+                <button class="btn-clear" id="clearFile">Remove</button>
+            </div>
+
+            <div class="options">
+                <span class="options-label">Redaction Level</span>
+                <div class="segmented-control">
+                    <label>
+                        <input type="radio" name="level" value="standard" checked>
+                        <span class="seg-title">Standard</span>
+                        <span class="seg-desc">Mask all but last 4</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="level" value="partial">
+                        <span class="seg-title">Partial</span>
+                        <span class="seg-desc">Mask first 4 only</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="level" value="full">
+                        <span class="seg-title">Full</span>
+                        <span class="seg-desc">Mask everything</span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="btn-process" id="processBtn" disabled>Process Document</button>
+
+            <div class="error-message" id="errorMessage" hidden></div>
+        </section>
+
+        <!-- Results -->
+        <section class="results-section" id="resultsSection" hidden>
+
+            <div class="results-header">
+                <span class="results-title">Analysis Complete</span>
+                <span class="results-status" id="resultsStatus">[DONE]</span>
+            </div>
+
+            <!-- Hero: Total Detections -->
+            <div class="hero-metric">
+                <div class="hero-number" id="statTotal">0</div>
+                <div class="hero-label">Total PII Detections</div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-value" id="statPages">0</span>
+                    <span class="stat-label">Pages</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statTime">0</span>
+                    <span class="stat-label">Time (ms)</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statLevel">--</span>
+                    <span class="stat-label">Level</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statFileType">--</span>
+                    <span class="stat-label">File Type</span>
+                </div>
+            </div>
+
+            <!-- Detection Breakdown with Segmented Bars -->
+            <div class="breakdown-section" id="breakdownSection">
+                <div class="breakdown-title">Detection Breakdown</div>
+                <div class="breakdown-items" id="breakdownItems"></div>
+            </div>
+
+            <!-- Detections Table -->
+            <div class="detections-section" id="detectionsSection" hidden>
+                <div class="detections-table-title">Detected Entities</div>
+                <table class="detections-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Masked Value</th>
+                            <th>Page</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detectionsBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Preview & Download -->
+            <div class="preview-section" id="previewSection" hidden>
+                <div class="preview-title">Redacted Output</div>
+                <div id="previewContainer"></div>
+                <a class="btn-download" id="downloadBtn" download="redacted">Download File</a>
+            </div>
+
+            <!-- No PII Found -->
+            <div class="no-pii-message" id="noPiiMessage" hidden>
+                <div class="no-pii-icon">0</div>
+                <div class="no-pii-text">No PII detected in this document</div>
+                <div class="no-pii-detail">Document is clean</div>
+            </div>
+        </section>
+
+        <!-- Loading -->
+        <div class="loading-overlay" id="loadingOverlay" hidden>
+            <span class="loading-text">[Processing...]</span>
+            <div class="loading-bar">
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p class="footer-text">RE<span class="footer-dot">-</span>DACT <span class="footer-dot">/</span> Zero-Data-Retention Redaction</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
