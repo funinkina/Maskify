@@ -16,7 +16,7 @@
   --text-primary: #E8E8E8;
   --text-display: #FFFFFF;
   --accent: #D71921;
-  --accent-subtle: rgba(215,25,33,0.15);
+  --accent-subtle: rgba(215, 25, 33, 0.15);
   --success: #4A9E5C;
   --warning: #D4A843;
   --interactive: #5B9BF6;
@@ -30,7 +30,9 @@
   --space-4xl: 96px;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -104,7 +106,7 @@ main {
   text-align: center;
   cursor: pointer;
   transition: border-color 200ms cubic-bezier(0.25, 0.1, 0.25, 1),
-              background 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    background 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .upload-zone:hover,
@@ -225,12 +227,12 @@ main {
   padding: 10px var(--space-sm);
   cursor: pointer;
   transition: background 200ms cubic-bezier(0.25, 0.1, 0.25, 1),
-              color 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    color 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
   text-align: center;
   position: relative;
 }
 
-.segmented-control label + label {
+.segmented-control label+label {
   border-left: 1px solid var(--border-visible);
 }
 
@@ -458,10 +460,21 @@ main {
   background: var(--border);
 }
 
-.seg-bar-fill.accent { background: var(--accent); }
-.seg-bar-fill.success { background: var(--success); }
-.seg-bar-fill.warning { background: var(--warning); }
-.seg-bar-fill.interactive { background: var(--interactive); }
+.seg-bar-fill.accent {
+  background: var(--accent);
+}
+
+.seg-bar-fill.success {
+  background: var(--success);
+}
+
+.seg-bar-fill.warning {
+  background: var(--warning);
+}
+
+.seg-bar-fill.interactive {
+  background: var(--interactive);
+}
 
 /* ---- Detections Table ---- */
 
@@ -528,9 +541,20 @@ main {
   color: var(--text-secondary);
 }
 
-.detection-type-tag.aadhaar { border-color: var(--accent); color: var(--accent); }
-.detection-type-tag.pan { border-color: var(--warning); color: var(--warning); }
-.detection-type-tag.payment_card { border-color: var(--interactive); color: var(--interactive); }
+.detection-type-tag.aadhaar {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.detection-type-tag.pan {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.detection-type-tag.payment_card {
+  border-color: var(--interactive);
+  color: var(--interactive);
+}
 
 /* ---- Preview ---- */
 
@@ -660,16 +684,40 @@ main {
   animation: loading-pulse 1.2s ease-in-out infinite;
 }
 
-.loading-bar span:nth-child(1) { animation-delay: 0s; }
-.loading-bar span:nth-child(2) { animation-delay: 0.15s; }
-.loading-bar span:nth-child(3) { animation-delay: 0.3s; }
-.loading-bar span:nth-child(4) { animation-delay: 0.45s; }
-.loading-bar span:nth-child(5) { animation-delay: 0.6s; }
-.loading-bar span:nth-child(6) { animation-delay: 0.75s; }
+.loading-bar span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.loading-bar span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.loading-bar span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.loading-bar span:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.loading-bar span:nth-child(5) {
+  animation-delay: 0.6s;
+}
+
+.loading-bar span:nth-child(6) {
+  animation-delay: 0.75s;
+}
 
 @keyframes loading-pulse {
-  0%, 100% { background: var(--border-visible); }
-  50% { background: var(--text-display); }
+
+  0%,
+  100% {
+    background: var(--border-visible);
+  }
+
+  50% {
+    background: var(--text-display);
+  }
 }
 
 /* ---- Footer ---- */
