@@ -59,6 +59,7 @@ def detect_aadhaar(text):
                     "start": match.start(),
                     "end": match.end(),
                     "length": 12,
+                    "confidence": 1.0,
                 }
             )
     return results
@@ -95,6 +96,7 @@ def detect_payment_cards(text):
                     "start": match.start(),
                     "end": match.end(),
                     "length": len(value),
+                    "confidence": 1.0,
                 }
             )
     return results
@@ -121,8 +123,62 @@ def detect_pan(text):
                     "start": match.start(),
                     "end": match.end(),
                     "length": 10,
+                    "confidence": 1.0,
                 }
             )
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Email Detection (regex-based)
+# ---------------------------------------------------------------------------
+
+EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def detect_email(text):
+    """Detect email addresses via regex."""
+    results = []
+    for match in EMAIL_REGEX.finditer(text):
+        value = match.group()
+        results.append(
+            {
+                "type": "email",
+                "value": value,
+                "start": match.start(),
+                "end": match.end(),
+                "length": len(value),
+                "confidence": 1.0,
+            }
+        )
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Phone Number Detection (regex-based, Indian format)
+# ---------------------------------------------------------------------------
+
+PHONE_REGEX = re.compile(r"(?:\+91[\s-]?)?(?:\d[\s-]?){10}")
+
+
+def detect_phone(text):
+    """Detect Indian phone numbers (optional +91 prefix, 10 digits)."""
+    results = []
+    for match in PHONE_REGEX.finditer(text):
+        value = match.group().strip()
+        digits_only = re.sub(r"[\s\-]", "", value)
+        if len(digits_only) < 10 or len(digits_only) > 13:
+            continue
+        results.append(
+            {
+                "type": "phone",
+                "value": value,
+                "start": match.start(),
+                "end": match.start() + len(value),
+                "length": len(value),
+                "confidence": 1.0,
+            }
+        )
     return results
 
 
@@ -131,25 +187,41 @@ def detect_pan(text):
 # ---------------------------------------------------------------------------
 
 
-def detect_all_pii(text):
+def detect_all_pii(text, use_ner=True, confidence_threshold=0.85):
     """Run all detectors and return a merged, deduplicated list sorted by position.
 
-    Deduplication: if two detections overlap, keep the longer one.
+    Deduplication: if two detections overlap, the one with higher confidence wins.
+    Ties are broken by keeping the longer match.
     """
     all_detections = []
+
+    # Rule-based detectors (always run)
     all_detections.extend(detect_aadhaar(text))
     all_detections.extend(detect_payment_cards(text))
     all_detections.extend(detect_pan(text))
+    all_detections.extend(detect_email(text))
+    all_detections.extend(detect_phone(text))
+
+    # NER-based detections (optional)
+    if use_ner:
+        from ner_detector import detect_ner_pii, is_ner_available
+
+        if is_ner_available():
+            all_detections.extend(detect_ner_pii(text, confidence_threshold))
 
     # Sort by start position
     all_detections.sort(key=lambda d: d["start"])
 
-    # Remove overlapping detections (keep longer match)
+    # Remove overlapping detections (higher confidence wins, then longer match)
     filtered = []
     for det in all_detections:
         if filtered and det["start"] < filtered[-1]["end"]:
-            # Overlap: keep the longer one
-            if det["length"] > filtered[-1]["length"]:
+            prev = filtered[-1]
+            prev_conf = prev.get("confidence", 1.0)
+            det_conf = det.get("confidence", 1.0)
+            if det_conf > prev_conf or (
+                det_conf == prev_conf and det["length"] > prev["length"]
+            ):
                 filtered[-1] = det
         else:
             filtered.append(det)
@@ -161,11 +233,18 @@ def get_mask_range(detection, level):
     """Return (start_offset, end_offset) of characters to mask within a detection.
 
     Offsets are relative to the detection's start position.
-    - full: mask all characters
-    - standard: mask all but last 4
-    - partial: mask first 4 only
+    - For text-based entities (name, address, email, phone): always mask fully
+    - For structured IDs:
+      - full: mask all characters
+      - standard: mask all but last 4
+      - partial: mask first 4 only
     """
     length = detection["length"]
+    det_type = detection["type"]
+
+    # Text-based entities are always fully masked
+    if det_type in ("name", "address", "email", "phone"):
+        return (0, length)
 
     if level == "full":
         return (0, length)

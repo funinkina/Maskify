@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from redaction import redact
 from audit import log_redaction
 
-app = FastAPI(title="RE-DACT", version="3.0.0")
+app = FastAPI(title="RE-DACT", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,15 +67,28 @@ MEDIA_TYPES = {
 }
 
 
+@app.on_event("startup")
+async def preload_ner():
+    """Pre-load the NER model at startup to avoid first-request latency."""
+    from ner_detector import is_ner_available, _get_pipeline
+
+    if is_ner_available():
+        _get_pipeline()
+
+
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "3.0.0"}
+    from ner_detector import is_ner_available
+
+    return {"status": "ok", "version": "3.1.0", "ner_available": is_ner_available()}
 
 
 @app.post("/api/process-file")
 async def process_file(
     file: UploadFile = File(...),
     level: str = Form("standard"),
+    use_ner: bool = Form(True),
+    confidence_threshold: float = Form(0.85),
 ):
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
@@ -98,7 +111,7 @@ async def process_file(
         with open(input_path, "wb") as f:
             f.write(await file.read())
 
-        output_path, stats = redact(input_path, level, work_dir)
+        output_path, stats = redact(input_path, level, work_dir, use_ner, confidence_threshold)
 
         processing_time_ms = int((time.time() - start_time) * 1000)
 

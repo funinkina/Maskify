@@ -20,6 +20,7 @@
   --success: #4A9E5C;
   --warning: #D4A843;
   --interactive: #5B9BF6;
+  --info: #8B5CF6;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -268,6 +269,63 @@ main {
   transition: color 200ms;
 }
 
+/* ---- NER Toggle ---- */
+
+.ner-options {
+  margin-top: var(--space-md);
+}
+
+.ner-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 10px 0;
+}
+
+.ner-toggle input {
+  display: none;
+}
+
+.ner-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border-visible);
+  border-radius: 999px;
+  transition: background 200ms;
+  flex-shrink: 0;
+}
+
+.ner-toggle input:checked + .ner-toggle-track {
+  background: var(--success);
+}
+
+.ner-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-display);
+  border-radius: 50%;
+  transition: transform 200ms;
+}
+
+.ner-toggle input:checked + .ner-toggle-track .ner-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.ner-toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ner-toggle-label .seg-title {
+  color: var(--text-primary);
+}
+
 /* ---- Process Button ---- */
 
 .btn-process {
@@ -476,6 +534,10 @@ main {
   background: var(--interactive);
 }
 
+.seg-bar-fill.info {
+  background: var(--info);
+}
+
 /* ---- Detections Table ---- */
 
 .detections-section {
@@ -552,6 +614,26 @@ main {
 }
 
 .detection-type-tag.payment_card {
+  border-color: var(--interactive);
+  color: var(--interactive);
+}
+
+.detection-type-tag.name {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.detection-type-tag.address {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.detection-type-tag.email {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.detection-type-tag.phone {
   border-color: var(--interactive);
   color: var(--interactive);
 }

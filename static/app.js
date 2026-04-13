@@ -87,9 +87,12 @@ processBtn.addEventListener("click", async () => {
 
   const level = document.querySelector('input[name="level"]:checked').value;
 
+  const useNer = document.getElementById("nerToggle").checked;
+
   const formData = new FormData();
   formData.append("file", selectedFile);
   formData.append("level", level);
+  formData.append("use_ner", useNer);
 
   loadingOverlay.classList.add("active");
   resultsSection.hidden = true;
@@ -152,6 +155,10 @@ function displayResults(data, level) {
     { key: "aadhaar", label: "Aadhaar UID", color: "accent" },
     { key: "pan", label: "PAN Card", color: "warning" },
     { key: "payment_card", label: "Payment Card", color: "interactive" },
+    { key: "name", label: "Name", color: "success" },
+    { key: "address", label: "Address", color: "info" },
+    { key: "email", label: "Email", color: "warning" },
+    { key: "phone", label: "Phone", color: "interactive" },
   ];
 
   const maxCount = Math.max(total, 1);
@@ -253,6 +260,10 @@ function formatType(type) {
     aadhaar: "Aadhaar",
     pan: "PAN",
     payment_card: "Card",
+    name: "Name",
+    address: "Address",
+    email: "Email",
+    phone: "Phone",
   };
   return labels[type] || type;
 }

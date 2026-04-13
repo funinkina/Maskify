@@ -11,7 +11,7 @@ import img2pdf
 from detectors import detect_all_pii, get_mask_range
 
 
-def Regex_Search(bounding_boxes):
+def Regex_Search(bounding_boxes, use_ner=True, confidence_threshold=0.85):
     """Reconstruct text from OCR bounding boxes and detect all PII types."""
     text = ""
     for character in range(len(bounding_boxes)):
@@ -20,7 +20,7 @@ def Regex_Search(bounding_boxes):
         else:
             text += "?"
 
-    detections = detect_all_pii(text)
+    detections = detect_all_pii(text, use_ner=use_ner, confidence_threshold=confidence_threshold)
 
     # Convert to array format compatible with masking: [detection_dict, ...]
     # Each detection already has start/end positions mapping to bounding_boxes indices
@@ -103,6 +103,8 @@ def Extract_and_Mask_UIDs(
     SR=False,
     sr_image_path=None,
     SR_Ratio=[1, 1],
+    use_ner=True,
+    confidence_threshold=0.85,
 ):
     """Try 8 orientations (4 rotations x 2 blur states) to detect and mask PII."""
     if SR is False:
@@ -135,7 +137,7 @@ def Extract_and_Mask_UIDs(
         img_bytes = io.BytesIO(img_encoded)
         image = Image.open(img_bytes)
         bounding_boxes = ocr.image_to_boxes(image, config=settings).split(" 0\n")
-        detections = Regex_Search(bounding_boxes)
+        detections = Regex_Search(bounding_boxes, use_ner=use_ner, confidence_threshold=confidence_threshold)
 
         if len(detections) == 0:
             continue
@@ -170,7 +172,7 @@ def _mask_value(detection, level):
     return "".join(chars)
 
 
-def redact(input_path, level, work_dir="."):
+def redact(input_path, level, work_dir=".", use_ner=True, confidence_threshold=0.85):
     """Main entry point. Processes PDF (all pages) or images.
 
     Returns (output_path_or_None, stats_dict).
@@ -180,7 +182,7 @@ def redact(input_path, level, work_dir="."):
 
     stats = {
         "total_detections": 0,
-        "by_type": {"aadhaar": 0, "pan": 0, "payment_card": 0},
+        "by_type": {},
         "pages_processed": 0,
         "detections": [],
     }
@@ -193,7 +195,9 @@ def redact(input_path, level, work_dir="."):
         for page_num, page in enumerate(pages, start=1):
             temp_img = os.path.join(work_dir, f"page_{page_num}.jpg")
             page.save(temp_img, "JPEG")
-            masked_img, detections = Extract_and_Mask_UIDs(temp_img, work_dir, level)
+            masked_img, detections = Extract_and_Mask_UIDs(
+                temp_img, work_dir, level, use_ner=use_ner, confidence_threshold=confidence_threshold
+            )
 
             if masked_img is not None:
                 masked_page_paths.append(masked_img)
@@ -233,7 +237,9 @@ def redact(input_path, level, work_dir="."):
     else:
         # Image file (JPG, JPEG, PNG)
         stats["pages_processed"] = 1
-        masked_img, detections = Extract_and_Mask_UIDs(input_path, work_dir, level)
+        masked_img, detections = Extract_and_Mask_UIDs(
+            input_path, work_dir, level, use_ner=use_ner, confidence_threshold=confidence_threshold
+        )
 
         if masked_img is not None:
             for det in detections:
