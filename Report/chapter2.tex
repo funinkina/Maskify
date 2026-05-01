@@ -28,6 +28,58 @@ Named Entity Recognition (NER) can detect unstructured entities such as people a
 
 Large language models have also been studied for PII redaction. Recent work such as PRvL evaluates LLM architectures for redaction accuracy, semantic preservation, latency, and leakage risk. Other work has combined OCR with LLMs for domain-specific redaction, such as drug-label redaction under Thailand's PDPA. These approaches show promise, but they can be expensive to run and may raise privacy concerns if sensitive documents are sent to external services.
 
+\bigskip
+
+For structured identifiers with mathematical validation, deterministic algorithms remain attractive because they are fast, explainable, and do not require training data or model inference. The Verhoeff checksum for Aadhaar validation and the Luhn checksum for payment card validation both provide strong false positive rejection with minimal computational cost. RE-DACT uses algorithmic validation for these structured identifiers while keeping NER optional for unstructured fields, balancing deterministic accuracy against broader but probabilistic coverage.
+
+Computer vision approaches can address visual redaction beyond text. Object detection models like YOLO can identify faces, license plates, and other visual PII in photographs and video frames. Segmentation approaches can isolate specific image regions for masking while preserving visual context. These approaches complement text-based redaction but require additional computational resources.
+
+The trend in modern redaction systems is toward combining multiple techniques: OCR for text extraction, pattern matching for candidate identification, mathematical validation for structured types, NER for unstructured types, and visual detection for non-text elements. The specific combination depends on the target document types, identifier formats, and performance requirements.
+
+\bigskip
+
+\section{Related Work in Document Redaction}
+
+Several existing tools and research contributions informed the design of RE-DACT.
+
+Adobe Acrobat Pro is a widely-used commercial PDF editor that supports manual redaction tools and features for removing hidden information. The tool is mature and provides a familiar interface for document workers, but it is not designed specifically around Indian identity number validation. Users must manually select regions to redact and cannot rely on automated detection of Aadhaar or PAN numbers.
+
+Microsoft Presidio is an open-source framework for detecting and anonymizing PII. It provides predefined recognizers for common entity types including credit card numbers, social security numbers, phone numbers, email addresses, and more. Presidio also supports credit-card-like number validation through pattern matching and Luhn checksum logic. However, Indian Aadhaar and PAN handling are not built-in and require custom development.
+
+The C-sanitized model examines privacy guarantees for document sanitization using information-theoretic ideas. Their work considers the semantic inference problem: even when explicit identifiers are removed, context in the remaining document might reveal the same information through linguistic patterns.
+
+Lee and Woods discuss automated redaction in digital archives and the need for workflows that fit different data sources. Their work on the BitCurator project addresses redaction in the context of digital forensics and born-digital collections, where sensitive information may be embedded in file metadata, directory structures, and fragmented content beyond visible document text.
+
+Thetbanthad et al. present an OCR-plus-LLM pipeline for redacting PII from drug labels to comply with Thailand's Personal Data Protection Act. Their work treats redaction as a complete pipeline: text extraction from product labels, classification of detected entities as sensitive or non-sensitive, application of masking, and evaluation against annotated test data.
+
+These related works collectively establish that effective redaction systems require multiple components working together: OCR for text extraction, detection logic for identifying sensitive content, masking implementation for applying redaction, file handling for diverse formats, and some form of auditability for compliance demonstration.
+
+\bigskip
+
+\section{Algorithms for PII Validation}
+
+The Verhoeff algorithm provides mathematical validation for Aadhaar numbers. Developed by Jacobus Verhoeff in 1969, the algorithm uses multiplication and permutation tables based on the dihedral group D5 to detect common transcription errors in decimal codes. For Aadhaar validation, the 12 digits are processed from right to left, with each digit's contribution to the checksum computed using the permutation table indexed by the digit position modulo 8 and the multiplication table indexed by the running checksum and the permuted digit value. A final checksum value of zero indicates that the number passes the check.
+
+In RE-DACT, a 12-digit candidate is reported as a valid Aadhaar number only if it passes the Verhoeff check and does not match an additional project-specific filter that rejects numbers ending in 1947. This filter addresses a common source of false positives: many documents contain year references that happen to form 12-digit sequences.
+
+The Luhn algorithm provides validation for payment card numbers. Also known as the modulus-10 algorithm, it is widely used in the payment card industry to verify card numbers before processing. The algorithm processes digits from right to left, doubling every second digit and subtracting 9 from results greater than 9, then checks whether the sum of all digits is divisible by 10.
+
+RE-DACT applies Luhn validation to digit sequences of 13 to 19 characters before reporting a payment card detection. The length range covers all standard payment card formats.
+
+PAN detection uses structural validation rather than a checksum. The PAN format of five uppercase letters, four digits, and a final uppercase letter is enforced through regular expression matching. Beyond the structural pattern, RE-DACT checks the fourth character against the set of valid holder-type characters: A, B, C, F, G, H, J, L, P, and T. This entity-type constraint does not prove that a PAN number is actually issued and active, but it rejects random alphanumeric strings that happen to match the format without being meaningful PANs.
+
+\bigskip
+
+\section{Related Work in Privacy Regulations}
+
+The regulatory landscape for data protection has evolved significantly in recent years, creating compliance requirements that drive demand for automated redaction tools.
+
+The General Data Protection Regulation (GDPR) in the European Union establishes comprehensive requirements for processing personal data of EU residents. The regulation defines personal data broadly to include any information relating to an identified or identifiable natural person. It requires data controllers to implement appropriate technical and organizational measures for protecting personal data. The regulation imposes substantial penalties for violations, with administrative fines up to 20 million euros or 4% of annual global turnover, whichever is higher.
+
+The Digital Personal Data Protection Act, 2023 represents India's comprehensive federal legislation for digital personal data protection. The act defines digital personal data and establishes duties for data fiduciaries and rights for data principals. It provides for notification of data breaches and imposes penalties for failures to protect personal data.
+
+These regulatory frameworks create practical compliance obligations for organizations that handle documents containing PII. The need to demonstrate proper handling of sensitive documents, including appropriate redaction before sharing, has become a concrete business requirement rather than merely a technical preference.
+
 For structured identifiers, deterministic validation remains attractive. A checksum algorithm is fast, explainable, and does not require training data. This is why RE-DACT uses algorithmic validation for Aadhaar and payment card candidates, while keeping NER optional for unstructured fields.
 
 \section{Related Work in Document Redaction}
@@ -79,8 +131,42 @@ Deployment simplicity & Some solutions require commercial software or cloud serv
 \end{tabular}
 \end{table*}
 
+\bigskip
+
+The practical implementation of redaction systems must consider the specific PII types relevant to Indian documents. Aadhaar numbers are validated through Verhoeff checksum because this algorithm was specifically designed to detect common transcription errors in identification numbers. The Luhn algorithm provides similar validation for payment cards. PAN numbers require structural validation because they lack a built-in checksum. Each validation approach has different false positive and false negative characteristics that affect system performance.
+
+The choice between validation approaches and pattern matching alone has significant implications for system accuracy. Pure pattern matching can identify all potential candidates but cannot distinguish valid from invalid numbers. Mathematical validation dramatically reduces false positives by rejecting numbers that fail the checksum, but it cannot recover candidates that fail due to OCR errors. The hybrid approach used in RE-DACT applies pattern matching to identify candidates and then validation to filter false positives.
+
+The evaluation of redaction systems must consider both precision and recall. Precision measures how often detected PII is actually sensitive information that should be redacted. Recall measures how often actual sensitive information in documents is successfully detected. Both metrics are important for different reasons. High precision means minimal wasted redaction effort on non-sensitive content. High recall means minimal risk of accidentally exposing sensitive information. The optimal balance depends on the specific use case and the relative costs of false positives versus false negatives.
+
+The design of effective redaction systems also requires attention to edge cases and practical constraints. Documents may contain multiple PII types in close proximity, requiring deduplication logic to avoid redundant masking. The same identifier may appear in multiple places within a document, and all instances should be consistently redacted. Documents may contain partial or corrupted identifiers that appear valid to pattern matchers but should not be reported as detections.
+
+\bigskip
+
+Practical deployment considerations include processing time requirements for user-facing applications. The system must balance thoroughness against responsiveness. Caching intermediate results and optimizing the OCR pipeline are important for real-time use. Error handling must be graceful, with informative messages rather than silent failures or cryptic errors. Logging and monitoring help operators understand system behavior and troubleshoot issues.
+
+The research landscape continues to evolve with new approaches to PII detection and document processing. Transformer-based models offer improved accuracy for NER tasks but require more computational resources. Multimodal approaches that combine text and image analysis may eventually handle more complex redaction scenarios.
+
+The choice between validation approaches and pattern matching alone has significant implications for system accuracy. Pure pattern matching can identify all potential candidates but cannot distinguish valid from invalid numbers. Mathematical validation dramatically reduces false positives by rejecting numbers that fail the checksum, but it cannot recover candidates that fail due to OCR errors. The hybrid approach used in RE-DACT applies pattern matching to identify candidates and then validation to filter false positives.
+
+The practical implementation of redaction systems must consider the specific PII types relevant to Indian documents. Aadhaar numbers are validated through Verhoeff checksum because this algorithm was specifically designed to detect common transcription errors in identification numbers. The Luhn algorithm provides similar validation for payment cards. PAN numbers require structural validation because they lack a built-in checksum. Each validation approach has different false positive and false negative characteristics that affect system performance.
+
+\bigskip
+
 \section{Summary}
 
 The literature shows that redaction systems need both recognition and judgment. OCR extracts text, but it may be noisy. Regex finds candidates, but it can over-match. NER adds context, but it is probabilistic and domain-sensitive. Checksum validation is narrow, but it is reliable for identifiers that support it.
 
 RE-DACT uses these methods where they fit best. It relies on deterministic validation for structured identifiers, optional NER for names and locations, and multi-orientation OCR for practical scan handling. The next chapter explains how these choices are implemented in the system design.
+
+\bigskip
+
+The literature establishes that redaction systems need both recognition and judgment. OCR extracts text from images but may be noisy or incomplete. Regular expressions find candidates but can over-match by including invalid identifiers. Named Entity Recognition adds context detection but is probabilistic and domain-sensitive. Deterministic validation is narrow but reliable for identifiers that support mathematical checksums.
+
+The practical evaluation of redaction systems must consider both precision and recall. Precision measures how often detected PII is actually sensitive information that should be redacted. Recall measures how often actual sensitive information in documents is successfully detected. Both metrics are important for different reasons. High precision means minimal wasted redaction effort on non-sensitive content. High recall means minimal risk of accidentally exposing sensitive information. The optimal balance depends on the specific use case and the relative costs of false positives versus false negatives.
+
+The design of effective redaction systems also requires attention to edge cases and practical constraints. Documents may contain multiple PII types in close proximity, requiring deduplication logic to avoid redundant masking. The same identifier may appear in multiple places within a document, and all instances should be consistently redacted. Documents may contain partial or corrupted identifiers that appear valid to pattern matchers but should not be reported as detections.
+
+Practical deployment considerations include processing time requirements for user-facing applications. The system must balance thoroughness against responsiveness. Caching intermediate results and optimizing the OCR pipeline are important for real-time use. Error handling must be graceful, with informative messages rather than silent failures or cryptic errors.
+
+The research landscape continues to evolve with new approaches to PII detection and document processing. Transformer-based models offer improved accuracy for NER tasks but require more computational resources. Multimodal approaches that combine text and image analysis may eventually handle more complex redaction scenarios. The specific constraints of Indian identity documents create a focused domain where deterministic approaches can outperform more general methods.

@@ -27,3 +27,9 @@ Testing on a small set of Indian identity-document samples showed reliable Aadha
 \bigskip
 
 \textbf{Keywords}: Redaction, PII, OCR, Verhoeff Algorithm, Luhn Algorithm, Tesseract, Privacy, Audit Logging, FastAPI
+
+\bigskip
+
+The motivation for this work stems from the practical challenge of handling sensitive Indian identity data safely in organizational workflows. Every day, government offices, educational institutions, healthcare providers, financial institutions, and private businesses receive identity proofs during onboarding, verification, claims processing, admission procedures, and compliance checks. The volume of such documents is substantial, and the manual effort required to redact them properly is correspondingly large. A small error during sharing can expose data that should have been hidden, leading to potential harm for the affected individuals and liability for the organization.
+
+The system combines multiple detection approaches: mathematical validation for structured identifiers, pattern matching for general formats, and optional machine learning for unstructured entities. The multi-orientation OCR handling ensures that rotated and angled documents can be processed without manual pre-processing. The character-level masking provides flexibility in redaction depth appropriate for different compliance scenarios.

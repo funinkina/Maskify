@@ -53,18 +53,70 @@ The project does not currently support video redaction, handwritten text recogni
 
 The implementation assumes that the input contains reasonably clear printed or typed text. Low-resolution images, glare, stylized fonts, strong background graphics, and poor contrast can reduce OCR quality and therefore reduce detection accuracy. The system is suitable for an academic prototype and moderate local use; high-volume production deployment would need explicit file-size limits, rate limiting, persistent job storage, stronger audit-chain recovery across restarts, and more robust operational monitoring.
 
+\bigskip
+
+The primary motivation is the practical challenge of handling sensitive Indian identity data safely in organizational workflows. Government offices, educational institutions, healthcare providers, financial institutions, and private businesses all routinely collect and process identity proofs during onboarding, verification, claims processing, admission procedures, and regulatory compliance activities. These identity documents often contain Aadhaar numbers, PAN details, payment card information, and personal contact details. The volume of such documents in any organization that handles Indian citizens is substantial, and the manual effort required to redact them properly is correspondingly large. A small error during sharing can expose data that should have been hidden, leading to potential harm for the affected individuals and liability for the organization.
+
+The Aadhaar ecosystem illustrates the scale of the problem. Every time an Indian resident applies for a government service, opens a bank account, enrolls in an educational institution, or completes a financial transaction, their Aadhaar number may appear on supporting documentation. The UIDAI has issued over 1.3 billion Aadhaar numbers, making it one of the largest identity systems in the world. The widespread use of Aadhaar for authentication and verification across government and private sector services means that Aadhaar numbers frequently appear in documents throughout the Indian economy. Protecting these numbers during document handling is therefore a matter of widespread practical importance.
+
+The PAN system presents a similar challenge. The Income Tax Department issues PAN cards to facilitate tax administration, but the PAN has become a general-purpose identifier required for financial transactions, property purchases, business registrations, and numerous other purposes. Ten-character alphanumeric PAN numbers appear on documents including tax returns, financial statements, property registration records, business correspondence, and KYC documentation. The fixed structure of PAN numbers (five letters, four digits, one letter) makes them identifiable through pattern matching, but the absence of a checksum requires alternative validation approaches.
+
+Payment card numbers follow international standards and appear on billing statements, transaction records, membership enrollment forms, and various business documents. The Luhn algorithm provides a standard validation mechanism that can verify whether a card number is syntactically valid, but implementing this validation requires explicit algorithmic support rather than simple pattern matching.
+
+\bigskip
+
+The system focuses on specific Indian identity document types and common payment instruments. It handles Aadhaar UIDs, PAN numbers, payment card numbers, email addresses, and phone numbers. It optionally adds Named Entity Recognition for names and locations. It does not attempt to detect passport numbers, driver license numbers, voter ID numbers beyond the existing scope, or other government-issued identifiers from other countries. The system is designed for Indian document contexts and may not transfer directly to other national identifier formats without modification.
+
+The system accepts PDF and common image formats. It does not handle Microsoft Word documents, text files, or other document formats that would require different parsing approaches. The OCR component processes only visual content and cannot extract text from documents that are already in digital form with selectable text.
+
+The system provides client-side processing through a browser interface and programmatic access through a REST API. It does not provide a mobile application, a command-line interface for batch processing, or integration with specific third-party platforms. These extensions could be built on top of the current implementation but are outside the current scope.
+
+The system implements zero-data-retention by design. Processed documents exist only in memory during request handling and are stored temporarily in ephemeral storage. The system does not maintain a database of processed documents or a history of past requests. This design choice aligns with privacy requirements but means that repeated access to the same document requires re-upload.
+
+\bigskip
+
+The project scope explicitly excludes certain advanced capabilities that could be added in future work. These include video redaction for moving images, batch processing for multiple documents simultaneously, advanced analytics on detection patterns, and integration with external verification services that could confirm identifier validity in real-time.
+
+The scope also excludes legal and compliance advice. The system provides technical redaction capability, but organizations must determine appropriate redaction levels and handling procedures based on their specific regulatory obligations. The audit logging provides evidence of processing but does not constitute legal compliance documentation.
+
+\bigskip
+
 \section{Organization of the Report}
 
-This report is organized into five chapters.
+This report is organized into five chapters that progressively develop the technical content from problem context through system design, implementation, evaluation, and conclusions.
 
-Chapter 1 introduces the problem, motivation, objectives, and scope of RE-DACT.
+Chapter 1 introduces the problem of automated redaction for Indian identity documents, explains the motivation for building the system, lists the specific project objectives, defines the scope of what the system covers and what it excludes, and outlines the report structure. This chapter establishes the practical motivation for the work and clarifies the boundaries of the implementation.
 
-Chapter 2 reviews related work in document redaction, OCR, PII detection, validation algorithms, and privacy requirements.
+Chapter 2 reviews related work in the areas of document redaction, optical character recognition, PII detection, validation algorithms, and privacy regulations. The chapter examines traditional approaches, AI-based approaches, existing tools and their limitations, and identifies the specific research gap that RE-DACT addresses. The regulatory framework section explains the compliance drivers that create demand for automated redaction solutions.
 
-Chapter 3 explains the system design and methodology, including the OCR pipeline, validation logic, masking behavior, overlap handling, audit logging, and API design.
+Chapter 3 explains the system design and methodology in detail. It covers the overall system architecture, the PII detection module design, the Verhoeff algorithm implementation for Aadhaar validation, the Luhn algorithm implementation for payment card validation, the PAN card detection with entity-type validation, Named Entity Recognition for unstructured PII, the multi-orientation OCR pipeline, masking strategies and implementation, overlap deduplication logic, tamper-evident audit logging, and the API design.
 
-Chapter 4 describes the implementation and presents test results, processing-time observations, interface behavior, and comparison with related tools.
+Chapter 4 describes the implementation and presents experimental results. It covers software and hardware requirements, test case execution, detection results, processing time measurements, interface behavior, performance evaluation, and comparison with related tools.
 
-Chapter 5 concludes the report and outlines future improvements such as stronger NER support, multilingual OCR, video redaction, batch processing, and containerized deployment.
+Chapter 5 concludes the report by summarizing the achievements of the project, reflecting on the extent to which objectives were met, and outlining future improvements including stronger NER support, multilingual OCR, video redaction, batch processing capabilities, and containerized deployment for enterprise environments.
 
-The References section lists the sources used for the technical and regulatory background. The appendices contain institutional material such as paper and plagiarism-report sections where required.
+The References section lists all sources used for the technical and regulatory background. The appendices contain institutional material such as lists of published papers and plagiarism report sections as required by the academic institution.
+
+\bigskip
+
+\bigskip
+
+The problem statement establishes the practical context that motivates this work. Organizations across sectors increasingly handle digital documents containing sensitive personal information that must be protected during sharing, archiving, or external review. The volume of such documents has grown exponentially with digital transformation initiatives across government, healthcare, financial services, and other sectors. Manual redaction processes cannot scale to meet this demand while maintaining consistent quality, creating operational challenges and compliance risks.
+
+The regulatory environment reinforces the urgency of addressing document redaction systematically. Data protection regulations impose specific obligations on organizations that handle personal information, with substantial penalties for violations. The GDPR in Europe and the Digital Personal Data Protection Act in India represent two significant regulatory frameworks that create compliance requirements for document handling. Organizations must demonstrate reasonable security measures for personal data, including appropriate redaction before sharing documents containing sensitive identifiers.
+
+The practical challenges of manual redaction include consistency across reviewers, completeness of coverage, and timeliness of processing. Different reviewers may apply different standards for what constitutes sensitive information. Even a single reviewer may apply different thresholds across multiple documents or over time. The risk of missing a sensitive identifier increases with document volume and complexity. These challenges create demand for automated solutions that can apply consistent criteria across all documents while maintaining acceptable accuracy levels.
+
+\bigskip
+
+The Aadhaar ecosystem illustrates the scale of the problem. Every time an Indian resident applies for a government service, opens a bank account, enrolls in an educational institution, or completes a financial transaction, their Aadhaar number may appear on supporting documentation. The UIDAI has issued over 1.3 billion Aadhaar numbers, making it one of the largest identity systems in the world. The widespread use of Aadhaar for authentication and verification across government and private sector services means that Aadhaar numbers frequently appear in documents throughout the Indian economy. Protecting these numbers during document handling is therefore a matter of widespread practical importance.
+
+The PAN system presents a similar challenge. The Income Tax Department issues PAN cards to facilitate tax administration, but the PAN has become a general-purpose identifier required for financial transactions, property purchases, business registrations, and numerous other purposes. Ten-character alphanumeric PAN numbers appear on documents including tax returns, financial statements, property registration records, business correspondence, and KYC documentation. The fixed structure of PAN numbers makes them identifiable through pattern matching, but the absence of a checksum requires alternative validation approaches.
+
+Payment card numbers follow international standards and appear on billing statements, transaction records, membership enrollment forms, and various business documents. The Luhn algorithm provides a standard validation mechanism that can verify whether a card number is syntactically valid, but implementing this validation requires explicit algorithmic support rather than simple pattern matching.
+
+\bigskip
+
+The problem statement establishes the practical context that motivates this work. Organizations across sectors increasingly handle digital documents containing sensitive personal information that must be protected during sharing, archiving, or external review. The volume of such documents has grown exponentially with digital transformation initiatives across government, healthcare, financial services, and other sectors. Manual redaction processes cannot scale to meet this demand while maintaining consistent quality, creating operational challenges and compliance risks.
+
+The regulatory environment reinforces the urgency of addressing document redaction systematically. Data protection regulations impose specific obligations on organizations that handle personal information, with substantial penalties for violations. The GDPR in Europe and the Digital Personal Data Protection Act in India represent two significant regulatory frameworks that create compliance requirements for document handling. Organizations must demonstrate reasonable security measures for personal data, including appropriate redaction before sharing documents containing sensitive identifiers.

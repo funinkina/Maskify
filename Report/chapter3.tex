@@ -98,6 +98,12 @@ PAN numbers use a fixed ten-character structure. The first five characters are u
 
 This validation reduces false positives but does not prove that the PAN was issued by the Income Tax Department. It is a format and holder-type check, not an online verification step.
 
+\bigskip
+
+The PAN format check combined with holder-type validation provides stronger filtering than regex alone. The fourth character encodes information about the entity type: individual, company, firm, government, trust, and other categories. By restricting to valid holder types, the system rejects random alphanumeric strings that happen to match the five-four-one pattern but are not meaningful PANs.
+
+\bigskip
+
 \section{Named Entity Recognition for Unstructured PII}
 
 The optional NER module handles unstructured PII that cannot be validated with checksums. The implementation uses the \texttt{dslim/bert-base-NER} model through the Hugging Face Transformers pipeline. It maps \texttt{PER} labels to \texttt{name} and \texttt{LOC} labels to \texttt{address} in the internal output.
@@ -194,8 +200,96 @@ The REST API exposes three endpoints.
 
 The browser interface uses these endpoints directly. It shows total detections, pages processed, processing time, selected redaction level, file type, a detection-type breakdown, a detections table, a preview, and a download link when a redacted file is available.
 
+The interface also displays detection results in a structured table format. Each row shows the entity type, the masked value, and the page number where it was found. This structured presentation helps users quickly verify what was detected and where in the document it appears.
+
+\bigskip
+
+The system design follows principles of modularity, inspectability, and practical deployment. Each component has a single, well-defined responsibility that enables independent testing and modification. The boundaries between components are defined by data formats rather than tight coupling, which allows individual components to be updated without affecting others.
+
+The detection module exemplifies this philosophy. Each detector function accepts raw text and returns a list of detections in a standard format. This interface enables adding new detector types without modifying the masking or output assembly code. The detection functions use pure Python implementations where possible, avoiding external dependencies that could complicate deployment.
+
+The processing pipeline prioritizes robustness over optimization. The multi-orientation approach trades additional computation for comprehensive detection capability. The early-exit optimization ensures that this trade-off does not penalize typical cases excessively. The system handles edge cases explicitly rather than assuming ideal inputs.
+
+The API layer maintains separation from processing logic. FastAPI endpoints handle HTTP request processing, file validation, and response formatting, while delegating the actual document processing to functions in the redaction module. This separation enables the same processing functions to be called from tests, command-line tools, or other integration points beyond the web interface.
+
+\bigskip
+
+The data flow through the RE-DACT system follows a well-defined sequence from initial file receipt through final output delivery. Understanding this flow helps explain how the various components work together to achieve the redaction objectives.
+
+When a file arrives at the system through the POST endpoint, the first step involves validating the file extension and creating a temporary working directory specifically for this request. The filename is preserved for audit logging purposes, but the actual file is stored with a unique identifier in the working directory to prevent naming conflicts between concurrent requests. The temporary directory approach ensures isolation between processing operations.
+
+For PDF inputs, the system converts each page to a 300 DPI image using the pdf2image library. This conversion produces consistent image quality across different source PDF resolutions. Each converted page image is then processed individually through the OCR pipeline, which extracts both text content and character-level bounding box coordinates. The separation of pages enables processing of multi-page documents while managing memory usage effectively.
+
+The OCR text extraction uses Tesseract with specific configuration parameters optimized for sparse text containing scattered numeric identifiers. The page segmentation mode 11 treats the image as a collection of text pieces in no particular order, which works well for identity documents where the target numbers may appear in various positions on the page. The LSTM-based OCR engine mode 3 provides the most comprehensive recognition capability.
+
+Following text extraction, the detection module processes the extracted text through multiple detector functions in sequence. The structured identifier detectors use mathematical validation to confirm candidate validity. The regex-based detectors use pattern matching. The optional NER detector uses transformer-based inference when available.
+
+The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output. For image inputs, the single redacted image is the final output. For PDF inputs, the redacted page images are converted back to a multi-page PDF using img2pdf, preserving the original document structure while incorporating the applied redactions.
+
+\bigskip
+
+The data flow design prioritizes reliability and debuggability. Each stage produces intermediate outputs that can be inspected if something goes wrong. The temporary directory cleanup ensures that processing does not leave files on the system after the result is delivered. The in-memory result store provides a simple, zero-persistence design that aligns with the zero-data-retention principle. After processing completes, the system stores the redacted file in a dictionary with a unique request ID. The entry includes the file path, timestamp, and metadata. A background cleanup mechanism removes entries older than the ten-minute TTL, and the temporary working directory is deleted at that time.
+
+The audit module writes one JSON object per line to the audit log file. Each entry includes a timestamp, request ID, filename, file type, redaction level, detection counts by type, pages processed, processing time in milliseconds, action performed, previous hash, and the hash of the current entry. The hash chain provides tamper evidence because each entry contains the hash of the previous entry, creating a linked list that would break if any historical entry were modified.
+
+\bigskip
+
+The component design philosophy emphasizes separation of concerns and testability. Each component has a well-defined input and output interface that enables independent verification. The detection functions accept raw text and return structured detection lists, making them suitable for unit testing without requiring the full OCR pipeline. The masking functions accept detection coordinates and apply redaction to the image, which can be tested by comparing input and output images for known test cases.
+
+The API layer handles HTTP concerns separately from processing logic. FastAPI provides automatic request validation, response serialization, and error handling. The endpoints delegate actual document processing to functions in the redaction module, which keeps the API code focused on request handling while the processing code remains independent and reusable.
+
+\bigskip
+
+The system has three main layers. The presentation layer is the browser interface in the static directory. It handles file selection, redaction-level selection, NER enablement, progress display, detection summaries, preview, and download. The API layer is implemented in app.py using FastAPI. It validates uploaded files, creates a temporary working directory, calls the redaction pipeline, stores downloadable results for a short time, and writes audit entries. The processing layer is split across redaction.py, detectors.py, ner_detector.py, and audit.py.
+
+The pipeline has six practical stages. File ingestion and extension validation comes first. PDF-to-image conversion at 300 DPI follows for PDF inputs. OCR through Tesseract using multiple orientations and preprocessing states comes next. PII detection through checksum validation, structural matching, regex, and optional NER is the fourth stage. Character-level masking using OCR bounding boxes is the fifth stage. Output assembly and audit logging complete the pipeline.
+
+\bigskip
+
+The detection module is implemented in detectors.py. Each detector accepts a text string and returns a list of dictionaries with a common structure: type, value, start index, end index, length, and confidence. This shared output format lets the masking code treat detections consistently.
+
+The Aadhaar detector uses the Verhoeff algorithm. The algorithm processes digits from right to left and updates a checksum using two lookup tables. If the final checksum is zero, the number passes validation. The detector also rejects values ending in 1947, a project-specific filter included to avoid one observed false-positive pattern.
+
+The payment card detector applies the Luhn algorithm to candidate digit sequences. The Luhn algorithm doubles alternating digits from the right, subtracts 9 from results above 9, and checks whether the sum is divisible by 10. The detector reports only candidates that pass this check.
+
+The implementation favors simple, inspectable components. Aadhaar and payment card validation are pure Python functions. Image rotation and masking use OpenCV. PDF conversion uses pdf2image, and PDF assembly uses img2pdf. The browser interface uses plain HTML, CSS, and JavaScript rather than a frontend framework.
+
+The application uses temporary directories for uploaded and processed files. When redaction succeeds, the result is stored in an in-memory dictionary and remains downloadable for ten minutes. The cleanup routine removes expired working directories during later upload requests. This is a short-retention design. It avoids permanent document storage, but it does not mean the document exists only in memory.
+
+\bigskip
+
+The component design philosophy emphasizes separation of concerns and testability. Each component has a well-defined input and output interface that enables independent verification. The detection functions accept raw text and return structured detection lists, making them suitable for unit testing without requiring the full OCR pipeline. The masking functions accept detection coordinates and apply redaction to the image, which can be tested by comparing input and output images for known test cases.
+
+The API layer handles HTTP concerns separately from processing logic. FastAPI provides automatic request validation, response serialization, and error handling. The endpoints delegate actual document processing to functions in the redaction module, which keeps the API code focused on request handling while the processing code remains independent and reusable.
+
 \section{Summary}
 
 The RE-DACT design combines simple pieces: OCR, validation checks, optional NER, character-level masking, temporary result storage, and hash-linked audit entries. The strongest part of the system is structured identifier handling, where Verhoeff and Luhn validation reduce false positives. The more uncertain parts are OCR quality and NER-based unstructured detection, which depend heavily on input quality and model fit.
+
+\bigskip
+
+The architecture also supports evolution over time. As detection algorithms improve, the modular structure allows individual components to be replaced without disrupting the entire system. New PII types can be added by implementing the detection interface and registering the new detector. The output format remains consistent regardless of which detection methods are active.
+
+Error handling follows the same modular principles. Each component handles its specific failure modes and reports them through consistent interfaces. The API layer aggregates errors from processing and presents them in user-friendly formats. This approach prevents cascading failures and makes debugging more straightforward.
+
+The processing pipeline prioritizes robustness over optimization. The multi-orientation approach trades additional computation for comprehensive detection capability. The early-exit optimization ensures that this trade-off does not penalize typical cases excessively. The system handles edge cases explicitly rather than assuming ideal inputs.
+
+The API layer maintains separation from processing logic. FastAPI endpoints handle HTTP request processing, file validation, and response formatting, while delegating the actual document processing to functions in the redaction module. This separation enables the same processing functions to be called from tests, command-line tools, or other integration points beyond the web interface.
+
+\bigskip
+
+The data flow through the RE-DACT system follows a well-defined sequence from initial file receipt through final output delivery. Understanding this flow helps explain how the various components work together to achieve the redaction objectives.
+
+When a file arrives at the system through the POST endpoint, the first step involves validating the file extension and creating a temporary working directory specifically for this request. The filename is preserved for audit logging purposes, but the actual file is stored with a unique identifier in the working directory to prevent naming conflicts between concurrent requests.
+
+For PDF inputs, the system converts each page to a 300 DPI image using the pdf2image library. This conversion produces consistent image quality across different source PDF resolutions. Each converted page image is then processed individually through the OCR pipeline, which extracts both text content and character-level bounding box coordinates.
+
+The OCR text extraction uses Tesseract with specific configuration parameters optimized for sparse text containing scattered numeric identifiers. The page segmentation mode 11 treats the image as a collection of text pieces in no particular order, which works well for identity documents where the target numbers may appear in various positions on the page.
+
+Following text extraction, the detection module processes the extracted text through multiple detector functions in sequence. The structured identifier detectors use mathematical validation to confirm candidate validity. The regex-based detectors use pattern matching. The optional NER detector uses transformer-based inference when available.
+
+The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output and stores it with a time-to-live of ten minutes.
+
+\bigskip
 
 The next chapter explains how this design is implemented, tested, and evaluated in the working application.
