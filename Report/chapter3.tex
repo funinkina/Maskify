@@ -1,248 +1,201 @@
-\chapter{System Design and Methodology (Non-Web Based/System Design(Web- based Projects)}
+\chapter{System Design and Methodology}
 
 \section{System Architecture Overview}
 
-The RE-DACT system implements a modular, multi-stage pipeline architecture that processes uploaded documents through a series of well-defined stages, each handling a specific aspect of the redaction workflow. The architecture balances detection accuracy with processing performance, incorporating optimizations that enable sub-300ms processing for typical documents while maintaining comprehensive scanning capability for challenging inputs.
+RE-DACT is designed as a small web application around a document-processing pipeline. The user uploads a PDF or image, selects a redaction level, optionally enables NER, and receives a redacted output file when the system finds PII.
 
-The system architecture follows a layered approach comprising the presentation layer, processing layer, and data layer. The presentation layer provides the web-based user interface through which users interact with the system, handling file upload, redaction level selection, and result visualization. The processing layer implements the core redaction logic including document conversion, OCR processing, PII detection, and masking operations. The data layer manages temporary file storage, result caching, and audit logging.
+The system has three main layers. The presentation layer is the browser interface in the \texttt{static} directory. It handles file selection, redaction-level selection, NER enablement, progress display, detection summaries, preview, and download. The API layer is implemented in \texttt{app.py} using FastAPI. It validates uploaded files, creates a temporary working directory, calls the redaction pipeline, stores downloadable results for a short time, and writes audit entries. The processing layer is split across \texttt{redaction.py}, \texttt{detectors.py}, \texttt{ner\_detector.py}, and \texttt{audit.py}.
 
-At the core of the architecture is a six-stage processing pipeline that transforms an uploaded document into a redacted output. The pipeline stages are: (1) File Ingestion and Type Detection, (2) PDF-to-Image Conversion at 300 DPI, (3) Multi-Orientation OCR with Preprocessing, (4) PII Detection via Checksum Validation, (5) Coordinate Masking and Output Assembly, and (6) Tamper-Evident Audit Logging. Each stage receives input from the previous stage, processes it according to defined logic, and passes output to the subsequent stage. This sequential design ensures clear data flow and simplifies debugging and testing.
+The pipeline has six practical stages:
 
-The architectural design emphasizes several key principles. Modularity allows individual components to be updated or replaced without affecting other parts of the system. For example, the PII detection algorithms can be enhanced or new detection types added without modifying the OCR or masking components. The zero-data-retention principle ensures that processed documents exist only in transient memory during request handling, addressing data privacy concerns. The thread-safe implementation enables concurrent request handling, supporting production deployment with multiple simultaneous users.
+\begin{enumerate}
+    \item File ingestion and extension validation.
+    \item PDF-to-image conversion at 300 DPI for PDF inputs.
+    \item OCR through Tesseract using multiple orientations and preprocessing states.
+    \item PII detection through checksum validation, structural matching, regex, and optional NER.
+    \item Character-level masking using OCR bounding boxes.
+    \item Output assembly and audit logging.
+\end{enumerate}
 
-The technology stack reflects these architectural choices. The backend uses FastAPI as the web framework, providing high performance and automatic API documentation. The redaction engine uses pure Python implementations of detection algorithms, avoiding heavy dependencies that could complicate deployment. Tesseract handles OCR through the pytesseract wrapper, and OpenCV manages image manipulation operations. The PDF processing uses pdf2image for conversion to images and img2pdf for reconstructing output PDFs from processed images.
+The implementation favors simple, inspectable components. Aadhaar and payment card validation are pure Python functions. Image rotation and masking use OpenCV. PDF conversion uses \texttt{pdf2image}, and PDF assembly uses \texttt{img2pdf}. The browser interface uses plain HTML, CSS, and JavaScript rather than a frontend framework.
 
-The frontend implements a single-page application with vanilla HTML, CSS, and JavaScript. This lightweight approach eliminates the need for framework dependencies while providing a responsive, intuitive interface. The dark-mode design aesthetic aligns with modern design preferences while ensuring readability. The interface provides immediate feedback during processing, displaying progress indicators and processing time metrics.
+The application uses temporary directories for uploaded and processed files. When redaction succeeds, the result is stored in an in-memory dictionary and remains downloadable for ten minutes. The cleanup routine removes expired working directories during later upload requests. This is a short-retention design. It avoids permanent document storage, but it does not mean the document exists only in memory.
 
 \section{PII Detection Module Design}
 
-The PII detection module forms the analytical core of the RE-DACT system, implementing specialized algorithms that identify sensitive information in extracted text. The module combines multiple detection strategies, each optimized for specific PII types found in Indian identity documents.
+The detection module is implemented in \texttt{detectors.py}. Each detector accepts a text string and returns a list of dictionaries with a common structure: type, value, start index, end index, length, and confidence. This shared output format lets the masking code treat detections consistently.
 
-The module's design follows a unified interface pattern where all detection algorithms conform to a common signature, accepting text input and returning a list of detection dictionaries. Each detection dictionary includes the type of PII identified, the actual value detected, character position information (start and end indices), length of the detection, and confidence score. This standardized format enables the downstream masking component to process detections uniformly regardless of which algorithm produced them.
+The rule-based detectors cover five PII types:
 
-The detection module supports five distinct PII types: Aadhaar UIDs validated through Verhoeff checksum, payment card numbers validated through Luhn algorithm, PAN card numbers validated through structural pattern matching, email addresses detected through regex pattern, and phone numbers detected through regex pattern. Each type has specific validation requirements that determine whether a candidate is considered a legitimate PII or a false positive to be rejected.
+\begin{enumerate}
+    \item Aadhaar numbers, validated with Verhoeff checksum.
+    \item Payment card numbers, validated with Luhn checksum.
+    \item PAN numbers, validated through structure and fourth-character holder type.
+    \item Email addresses, detected with regex.
+    \item Indian phone-number-like strings, detected with regex.
+\end{enumerate}
 
-The detection process begins with regex pattern matching to identify candidate sequences within the extracted text. Regular expressions are crafted to match the structural format of each PII type without attempting validation. For example, the pattern `\d{12}` identifies any twelve-digit sequence that could be an Aadhaar number, and the pattern `[A-Z]{5}[0-9]{4}[A-Z]` identifies any ten-character alphanumeric sequence matching PAN format. These candidates are then passed to the validation functions that apply mathematical or structural checks.
+The optional NER detector adds two more categories: names and address/location-like text. It uses the Hugging Face \texttt{dslim/bert-base-NER} model when \texttt{transformers} and \texttt{torch} are installed. If these dependencies are missing, the system continues with rule-based detection only.
 
-The validation step is crucial for eliminating false positives. Without validation, any twelve-digit number would be flagged as potential Aadhaar, leading to excessive false detections. The validation algorithms use mathematical properties of the identification numbers to distinguish genuine identifiers from random numbers that happen to match the format. This mathematical validation is what enables the near-zero false positive rate that distinguishes RE-DACT from pattern-matching-only systems.
+Detection begins with candidate extraction. For Aadhaar and payment cards, the system searches for continuous digit sequences. For PAN, it searches for the official alphanumeric structure. The current implementation does not normalize spaced or dashed Aadhaar/PAN strings before detection, so such formats are a limitation. Candidate strings then pass through the relevant validation check before being reported.
 
-Following validation, the module performs overlap deduplication. When multiple detection algorithms identify the same or overlapping character sequences, the system must determine which detection to retain. The deduplication algorithm sorts detections by position, then iterates through them, keeping the first detection and discarding any that overlap with previously retained detections. For overlapping detections, the algorithm retains the one with higher confidence score or, for equal confidence, the longer detection. This ensures each character in the text is attributed to at most one PII entity.
-
-The module also supports optional Named Entity Recognition (NER) for detecting unstructured PII like names and addresses. When the transformers and torch libraries are available, the module uses a BERT-based NER pipeline to identify PERSON and LOCATION entities in the text. These detections are merged with rule-based detections using the same deduplication logic. When NER libraries are unavailable, the module gracefully falls back to rule-based detection only.
-
-The confidence scoring system enables downstream processing to make informed decisions about detections. Rule-based detections with mathematical validation receive a confidence score of 1.0 (maximum certainty), as the mathematical algorithms provide deterministic validation. NER-based detections receive confidence scores from the underlying BERT model, thresholded at 0.85 by default to balance precision and recall. Users can adjust this threshold through API parameters to tune detection behavior for their specific use cases.
+After all detectors run, the module removes overlapping detections. It sorts detections by start position. If a new detection overlaps the most recently retained detection, the one with higher confidence is kept. If confidence is equal, the longer detection is kept. This rule is simple and predictable, but it also means a longer payment-card detection can replace a shorter overlapping Aadhaar detection when both have the same confidence.
 
 \section{Verhoeff Algorithm for Aadhaar Validation}
 
-The Aadhaar UID validation implements the Verhoeff algorithm, a sophisticated checksum scheme that catches all single-digit errors and all adjacent digit transpositions. This algorithm is particularly well-suited for Aadhaar validation because the Indian government designed the number allocation to support Verhoeff validation, making the algorithm applicable to all genuine Aadhaar numbers.
+The Aadhaar detector uses the Verhoeff algorithm. The algorithm processes digits from right to left and updates a checksum using two lookup tables: a multiplication table and a permutation table. If the final checksum is zero, the number passes validation.
 
-The mathematical foundation of the Verhoeff algorithm relies on the dihedral group D5, which has ten elements corresponding to the digits 0-9. The group operation is defined through a 10×10 multiplication table where each cell contains the result of multiplying two elements. Additionally, a permutation table of size 8×10 specifies how each digit should be transformed based on its position in the number. The algorithm iterates through the digits from right to left, using the position index to select the appropriate permutation value for each digit, then combining this with the running checksum through the group operation.
-
-The implementation uses two static tables defined at module level for efficiency. The VERHOEFF\_MULT table contains the multiplication table for the dihedral group, a 10×10 matrix where each row represents one element's multiplication results with the digits 0-9. The VERHOEFF\_PERM table contains the position-based permutation matrix, an 8×10 matrix where each row specifies how the digits should be permuted at that position. The eight rows correspond to the eight possible positions in a 12-digit number (positions 0-7 repeat for longer numbers).
-
-The verhoeff\_checksum function takes a number string as input and returns an integer checksum value. The function converts the number string to a tuple of integer digits in reversed order (processing from right to left), initializes the checksum to zero, then iterates through each digit. For each digit at position i, the function updates the checksum using the formula: checksum = VERHOEFF\_MULT[checksum][VERHOEFF\_PERM[i % 8][digit]]. After processing all digits, a checksum of zero indicates a valid number.
-
-The detect\_aadhaar function applies Verhoeff validation to identify valid Aadhaar numbers. It searches the text for twelve-digit sequences using regex, then calls verhoeff\_checksum on each candidate. Candidates with checksum equal to zero are valid Aadhaar numbers. The function applies an additional filter rejecting numbers ending in 1947, which addresses a specific false positive pattern observed in real documents where common year references match the Aadhaar format but are not actual identification numbers.
-
-Pseudo-code for the Aadhaar detection process follows:
+In RE-DACT, \texttt{detect\_aadhaar} searches for 12-digit candidates, applies \texttt{verhoeff\_checksum}, and reports only candidates whose checksum is zero. It also rejects values ending in \texttt{1947}, a project-specific filter included to avoid one observed false-positive pattern.
 
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} Image $I$ (via OCR text extraction)
-\STATE \textbf{Output:} List of valid Aadhaar detections
-\STATE Extract text and bounding boxes $B$ from $I$ via Tesseract OCR.
-\STATE Find all 12-digit candidate strings $S$ using regex `\d{12}`.
-\FOR{each candidate $s$ in $S$}
+\STATE \textbf{Input:} OCR text
+\STATE \textbf{Output:} Aadhaar detections
+\STATE Find all 12-digit candidate strings.
+\FOR{each candidate $s$}
     \STATE $c \leftarrow \text{VerhoeffChecksum}(s)$
-    \IF{$c = 0$ AND $s \bmod 10000 \neq 1947$}
-        \STATE Get coordinates for $s$ from bounding boxes $B$.
-        \STATE Add detection to results with type "aadhaar", position, and confidence 1.0.
+    \IF{$c = 0$ and $s$ does not end with 1947}
+        \STATE Add an Aadhaar detection with confidence 1.0.
     \ENDIF
 \ENDFOR
-\STATE \textbf{return} Results list
+\STATE \textbf{return} detection list
 \end{algorithmic}
 
-The algorithmic complexity of Aadhaar validation is O(n) where n is the number of digits (12 for Aadhaar). This makes validation computationally trivial compared to OCR processing. The deterministic nature of the algorithm means that the same input always produces the same output, enabling consistent detection across multiple processing runs.
+The validation cost is negligible compared with OCR because Aadhaar has a fixed length of 12 digits.
 
 \section{Luhn Algorithm for Payment Card Validation}
 
-The payment card validation implements the Luhn algorithm (also known as modulus-10 or mod-10 algorithm), which serves as the international standard for validating credit card numbers, IMEI numbers, and other identification numbers. The algorithm detects common transcription errors including single-digit errors and most adjacent transpositions.
-
-The Luhn algorithm operates by computing a weighted sum of the digits in the number and checking whether this sum is divisible by 10. The weighting alternates for each digit: digits in even positions from the right (including the rightmost check digit at position 0) are used unchanged, while digits in odd positions are doubled. When doubling a digit results in a value greater than 9, the digits of the result are summed (equivalent to subtracting 9). The sum of all weighted digits must be divisible by 10 for the number to be valid.
-
-The luhn\_checksum function implements this algorithm in Python. The function converts the number string to a list of integer digits, then iterates through the list from the third-from-last digit to the first, doubling every second digit. For doubled digits exceeding 9, the function subtracts 9 to get the correct contribution. Finally, the function returns True if the sum modulo 10 equals zero.
-
-The detect\_payment\_cards function applies Luhn validation to identify valid payment card numbers. It searches the text for digit sequences of 13-19 digits (the valid range for payment card numbers), then applies Luhn validation to each candidate. The function maintains a separate detection type \"payment_card\" to distinguish these from Aadhaar detections, even though some very long numbers might theoretically overlap.
-
-The payment card detection also implements overlap handling with Aadhaar detections. When a 12-digit valid Aadhaar appears as the prefix of a longer valid payment card number, the system must decide how to handle the overlap. The current implementation prioritizes Aadhaar detection (due to the specific nature of the Indian identity system), meaning that 12-digit sequences validated as Aadhaar are reported as such rather than as partial payment card numbers.
-
-Pseudo-code for payment card detection:
+The payment card detector uses the Luhn algorithm. It scans digit sequences of 13--19 characters, doubles every second digit from the right, subtracts 9 from doubled digits above 9, and checks whether the final sum is divisible by 10.
 
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} Image $I$ (via OCR text extraction)
-\STATE \textbf{Output:} List of valid payment card detections
-\STATE Extract text and bounding boxes $B$ from $I$ via Tesseract OCR.
-\STATE Find all 13-19 digit candidate strings $S$ using regex `\d{13,19}`.
-\FOR{each candidate $s$ in $S$}
-    \IF{$\text{LuhnChecksum}(s) = 0$}
-        \STATE Get coordinates for $s$ from bounding boxes $B$.
-        \STATE Add detection to results with type "payment\_card", position, and confidence 1.0.
+\STATE \textbf{Input:} OCR text
+\STATE \textbf{Output:} payment card detections
+\STATE Find all 13--19 digit candidate strings.
+\FOR{each candidate $s$}
+    \IF{$\text{LuhnChecksum}(s)$ is true}
+        \STATE Add a payment card detection with confidence 1.0.
     \ENDIF
 \ENDFOR
-\STATE \textbf{return} Results list
+\STATE \textbf{return} detection list
 \end{algorithmic}
 
-The computational complexity of Luhn validation is O(n) where n is the number of digits (13-19 for payment cards). Like Verhoeff validation, this is computationally trivial compared to text extraction. The algorithm's widespread standardization means it correctly validates all major card schemes including Visa, Mastercard, American Express, and RuPay.
+The Luhn check is not proof that a card is active or issued. It only confirms that the number follows a valid checksum pattern. This is still useful because it rejects many random digit sequences that regex alone would flag.
 
 \section{PAN Card Detection with Entity Validation}
 
-PAN card detection differs fundamentally from Aadhaar and payment card validation because PAN numbers do not incorporate a mathematical checksum. Instead, validation relies entirely on structural pattern matching with additional semantic constraints from the entity type field.
-
-The structural formulation defines a valid PAN as a ten-character string matching the pattern: first five characters are uppercase letters (A-Z), next four characters are digits (0-9), and the final character is an uppercase letter. This pattern alone filters out most random alphanumeric sequences but still accepts invalid PANs that happen to match the format.
-
-The entity type validation adds a semantic constraint to structural matching. The fourth character of a PAN encodes the holder's entity type according to the following mapping: A represents Association of Persons, B represents Body of Individuals, C represents Company, F represents Firm, G represents Government, H represents Hindu Undivided Family, J represents Artificial Juridical Person, L represents Local Authority, P represents Individual, and T represents Trust. Only PANs where the fourth character falls within this valid set are considered genuine.
-
-The implementation uses compiled regular expressions for efficient pattern matching. The PAN\_REGEX pattern `[A-Z]{5}[0-9]{4}[A-Z]` matches ten-character alphanumeric sequences matching the PAN structure. The VALID\_PAN\_4TH\_CHARS set contains the valid entity type characters. The detect\_pan function applies both the pattern match and the entity type validation, adding detections only when both conditions are satisfied.
-
-Pseudo-code for PAN detection:
+PAN numbers use a fixed ten-character structure. The first five characters are uppercase letters, the next four are digits, and the last character is an uppercase letter. The fourth character represents the holder type. RE-DACT checks the fourth character against the valid set \texttt{A, B, C, F, G, H, J, L, P, T}.
 
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} Image $I$ (via OCR text extraction)
-\STATE \textbf{Output:} List of valid PAN card detections
-\STATE Extract text and bounding boxes $B$ from $I$ via Tesseract OCR.
-\STATE Find all 10-character alphanumeric candidate strings $S$ using regex `[A-Z]{5}[0-9]{4}[A-Z]`.
-\FOR{each candidate $s$ in $S$}
-    \IF{$s[3]$ (4th character) is in VALID\_PAN\_4TH\_CHARS}
-        \STATE Get coordinates for $s$ from bounding boxes $B$.
-        \STATE Add detection to results with type "pan", position, and confidence 1.0.
+\STATE \textbf{Input:} OCR text
+\STATE \textbf{Output:} PAN detections
+\STATE Find candidates matching five letters, four digits, and one letter.
+\FOR{each candidate $s$}
+    \IF{the fourth character is a valid holder-type code}
+        \STATE Add a PAN detection with confidence 1.0.
     \ENDIF
 \ENDFOR
-\STATE \textbf{return} Results list
+\STATE \textbf{return} detection list
 \end{algorithmic}
 
-The PAN detection relies on proper OCR output being in uppercase. Tesseract's configuration includes the `--psm 11` (sparse text) mode optimized for scattered text like that found on identity documents, and the default behavior outputs uppercase for alphabetic characters. However, the OCR may produce lowercase output in some cases, requiring pre-processing to convert text to uppercase before PAN detection.
-
-The algorithmic complexity of PAN detection is O(n) where n is the text length, dominated by the regex matching operation. The detection does not involve iterative computation like the Verhoeff or Luhn algorithms, making it computationally lightweight.
+This validation reduces false positives but does not prove that the PAN was issued by the Income Tax Department. It is a format and holder-type check, not an online verification step.
 
 \section{Named Entity Recognition for Unstructured PII}
 
-Beyond the structured PII types with mathematical validation, RE-DACT optionally incorporates Named Entity Recognition (NER) for detecting unstructured personally identifiable information such as names and addresses. This capability extends the system's detection beyond format-specific identifiers to general PII categories.
+The optional NER module handles unstructured PII that cannot be validated with checksums. The implementation uses the \texttt{dslim/bert-base-NER} model through the Hugging Face Transformers pipeline. It maps \texttt{PER} labels to \texttt{name} and \texttt{LOC} labels to \texttt{address} in the internal output.
 
-The NER implementation uses the dslim/bert-base-NER model from Hugging Face Transformers, a BERT-based model fine-tuned for named entity recognition on the CoNLL-2003 dataset. The model identifies PERSON entities (individual names) and LOCATION entities (places, addresses) with associated confidence scores. A threshold parameter (default 0.85) filters out low-confidence detections that may represent false positives.
+The module first checks whether \texttt{transformers} and \texttt{torch} can be imported. If not, it returns an empty list and the rest of the system continues normally. When the dependencies are present, the FastAPI startup event preloads the model to avoid first-request latency.
 
-The implementation handles the fundamental challenge of applying transformer-based NER to OCR output: token length limitations. BERT models have a maximum token limit of 512 tokens, which is sufficient for most single-page documents but requires chunking for longer texts. The detect\_ner\_pii function implements overlapping chunk processing to handle texts exceeding the token limit. The text is divided into chunks of 512 tokens with 50-token overlap between chunks to ensure entities spanning chunk boundaries are captured. Detections from overlapping chunks are merged using a position-based deduplication strategy.
+The NER function processes long OCR strings in 512-character chunks with a 50-character overlap. This is a practical implementation detail in the current code; it is not token-aware chunking. Each returned entity is filtered by confidence threshold, defaulting to 0.85. Duplicate spans created by overlapping chunks are skipped.
 
-The NER pipeline requires the transformers and torch libraries, which are optional dependencies. When these libraries are not available, the system gracefully falls back to rule-based detection only, maintaining basic functionality without the additional NER capability. The is\_ner\_available function checks for library availability at startup, and the system reports NER capability status through the health endpoint.
-
-The NER label mapping translates model output to internal PII types: PER (Person) maps to "name" and LOC (Location) maps to "address". These detection types receive lower confidence scores than mathematically validated detections, reflecting the probabilistic nature of NER compared to deterministic validation. The confidence threshold ensures only high-quality detections are reported, though users can adjust this parameter through the API.
-
-The use case for NER extends the system's applicability beyond specifically formatted identification numbers to general sensitive information. A document might contain a person's name, home address, or organization name that should be redacted but does not follow the specific patterns of Aadhaar, PAN, or payment card numbers. The NER capability handles these cases, making the system more comprehensive in its protection capabilities.
-
-The computational cost of NER significantly exceeds rule-based detection. Loading the BERT model requires substantial memory, and inference time is measured in seconds rather than milliseconds. This is why NER remains optional, enabled by default but can be disabled through the use\_ner API parameter for applications that do not require unstructured PII detection.
+NER improves coverage for names and locations, but it has clear limits. The model was trained on English news text, not Indian identity cards or OCR output. It may miss address fragments, mislabel organizations, or behave poorly on noisy scans. For this reason, the report treats NER as an optional extension rather than the main basis for redaction.
 
 \section{Multi-Orientation OCR Pipeline}
 
-The multi-orientation OCR pipeline addresses one of the most common practical challenges in document processing: handling documents that arrive in non-standard orientations. Whether due to scanning artifacts, mobile photography at angles, or physical document placement during digitization, rotated documents cause standard OCR to fail, resulting in missed detections and incomplete redaction.
+The multi-orientation OCR pipeline is implemented in \texttt{Extract\_and\_Mask\_UIDs}. It exists because scanned documents are often rotated. A single OCR pass may fail if the text is sideways or upside down.
 
-The pipeline systematically tests eight preprocessing combinations before concluding no PII is present. These combinations arise from the Cartesian product of four rotation angles and two image preprocessing states. The rotation angles are 0° (no rotation), 90° counterclockwise, 180°, and 90° clockwise. The preprocessing states are original grayscale and Gaussian-blurred with a 5×5 kernel. The Gaussian blur reduces noise artifacts from scanning or photography that might interfere with character recognition, and testing both blurred and non-blurred variants ensures robustness across image quality levels.
+For each image, the system converts the input to grayscale and prepares eight variants:
 
-The implementation uses OpenCV for image manipulation. The cv2.rotate function handles rotation operations using predefined rotation matrices (ROTATE\_90\_COUNTERCLOCKWISE, ROTATE\_180, ROTATE\_90\_CLOCKWISE). The cv2.GaussianBlur function applies the blur with parameters (5,5) for kernel size and 0 for sigma (automatically computed from kernel size). These transformations produce eight distinct images from the single input document.
+\begin{enumerate}
+    \item original orientation,
+    \item 90 degrees counterclockwise,
+    \item 180 degrees,
+    \item 90 degrees clockwise,
+    \item blurred original,
+    \item blurred 90 degrees counterclockwise,
+    \item blurred 180 degrees,
+    \item blurred 90 degrees clockwise.
+\end{enumerate}
 
-The Tesseract configuration optimizes for identity document scanning. The `-l eng` parameter specifies English language recognition, appropriate for the alphanumeric content on Indian identity documents. The `--oem 3` parameter selects OCR Engine Mode 3, which uses LSTM neural networks combined with the legacy engine for maximum accuracy. The `--psm 11` parameter selects Page Segmentation Mode 11 (sparse text), which treats the image as a collection of text pieces in no particular order, appropriate for documents with scattered numeric identifiers like identity numbers.
+The blur uses a $5 \times 5$ Gaussian kernel. Tesseract runs with English OCR, OCR engine mode 3, and page segmentation mode 11 for sparse text. After each OCR attempt, the system reconstructs text from character bounding boxes and runs the PII detectors.
 
-The early-exit optimization ensures reasonable performance for typical documents. Rather than testing all eight preprocessing combinations regardless of results, the pipeline terminates upon the first orientation that yields any PII detection. For correctly oriented documents (the common case), this means only the first preprocessing variant is tested, with subsequent variants never executed. This optimization is crucial for achieving the sub-300ms processing target for typical documents; exhaustive testing of all eight orientations would increase processing time by up to 8×.
-
-When no detections are found in any orientation, the pipeline completes all eight attempts before returning an empty detection list. This handles the worst-case scenario of severely rotated or rotated-and-flipped documents. The processing time for such documents increases significantly (up to 1582ms in testing), but this represents an acceptable trade-off for comprehensive detection capability.
-
-The coordinate transformation between OCR output and image coordinates requires careful handling. Tesseract reports bounding box coordinates in a bottom-left origin coordinate system commonly used in document processing, while OpenCV uses a top-left origin system for image manipulation. The transformation calculates y-coordinate as image height minus the original y-coordinate, effectively flipping the vertical axis to correctly map text positions to pixel coordinates.
-
-Pseudo-code for the multi-orientation processing:
+The pipeline stops at the first variant that produces at least one detection. This early exit keeps correctly oriented documents fast. If none of the eight variants produces a detection, the function returns no masked output for that image.
 
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} Image file path, redaction level
-\STATE \textbf{Output:} Masked image path and detection list
-\STATE Read image and convert to grayscale.
-\STATE Define rotation list: [original, rotate90, rotate180, rotate270, blurred, blurred+rotate90, blurred+rotate180, blurred+rotate270]
-\STATE For each rotation in list:
-    \STATE Extract text and bounding boxes using Tesseract.
-    \STATE Run PII detection algorithms on extracted text.
-    \IF{any detections found}
-        \STATE Apply masking to image coordinates.
-        \STATE Save masked image.
-        \STATE Return masked image path and detection list.
+\STATE \textbf{Input:} image path and redaction level
+\STATE \textbf{Output:} masked image path and detections
+\STATE Convert image to grayscale.
+\STATE Build eight orientation/preprocessing variants.
+\FOR{each variant}
+    \STATE Extract character boxes with Tesseract.
+    \STATE Reconstruct text from OCR boxes.
+    \STATE Run PII detection.
+    \IF{one or more detections are found}
+        \STATE Mask the selected character boxes on the image.
+        \STATE Return the masked image path and detections.
     \ENDIF
-\STATE \textbf{return} (None, empty list) if no orientation yields detections
+\ENDFOR
+\STATE \textbf{return} no output and an empty detection list
 \end{algorithmic}
-
-This pipeline represents a key innovation of the RE-DACT system, providing robust handling of orientation variation that causes other systems to fail.
 
 \section{Masking Strategies and Implementation}
 
-The masking component transforms detection results into visible redaction on the output document. RE-DACT implements three masking levels providing different amounts of information preservation, allowing users to select the appropriate level for their compliance requirements.
+The masking logic is controlled by \texttt{get\_mask\_range}. It returns the range of characters to hide inside each detected value.
 
-The standard masking level preserves the last four characters of detected PII while masking all preceding characters. For example, an Aadhaar number like 123456789012 becomes XXXXXXXX9012 after standard redaction. This approach enables manual verification of redacted documents while still protecting the primary identifier, useful for cases where reviewers need to confirm that the correct field was processed without exposing the full number.
+For structured identifiers, the current behavior is:
 
-The partial masking level preserves the first four characters while masking all subsequent characters. Using the same example, 123456789012 becomes XXXX56789012 after partial redaction. This approach maintains the prefix for context while fully protecting the unique identifier portion, useful when the prefix carries classification meaning (such as the first digits identifying the issuing authority) while the remaining digits constitute the sensitive identifier.
+\begin{enumerate}
+    \item Standard: mask all characters except the last four.
+    \item Partial: mask the first four characters only.
+    \item Full: mask every character.
+\end{enumerate}
 
-The full masking level masks all characters in the detected PII with no preservation. The example becomes XXXXXXXXXXXX after full redaction, providing maximum protection with complete obscuration of the sensitive information. This approach is appropriate for high-security scenarios where any partial exposure should be avoided.
+For names, locations, email addresses, and phone numbers, the implementation always returns the full range. This prevents partial disclosure of values that do not have a safe or useful fixed reveal pattern.
 
-The masking implementation operates at the pixel level using OpenCV. For each character in a detection that should be masked, the system retrieves the corresponding bounding box coordinates from the OCR output. These coordinates define a rectangle around the specific character, which is then filled with black color using the cv2.rectangle function with thickness -1 (filling the rectangle). This character-level masking enables precise control over which portions of a detection are obscured, unlike whole-box masking that would obscure all content within the detection's overall bounding box.
+Masking happens at the character level. Tesseract returns one bounding box per recognized character. For each character selected for masking, OpenCV draws a filled black rectangle over the corresponding box. If OCR was performed on a rotated version of the image, the code rotates the image before masking and rotates it back afterward, so the final output matches the original orientation.
 
-The coordinate transformation for proper rectangle placement considers the rotation applied during OCR processing. When OCR was performed on a rotated image, the coordinates must be transformed back to the original image space before applying rectangles. The Mask\_UIDs function receives the rotation type as a parameter and applies inverse rotation after masking, ensuring the output image has the correct orientation matching the original input.
-
-For multi-page PDF documents, the system processes each page individually. The pdf2image library converts each PDF page to a separate image at 300 DPI, providing sufficient resolution for accurate OCR. Each page is processed through the multi-orientation pipeline, and detections are recorded with page numbers for tracking. After processing all pages, the img2pdf library combines the processed page images into a single output PDF, maintaining the original document's page structure.
-
-The get\_mask\_range function calculates which characters within a detection should be masked based on the selected level. This function takes the detection dictionary and level string as parameters, returning the start and end indices of characters to mask. For structured identifiers (Aadhaar, payment card, PAN), the function applies level-specific logic. For unstructured entities (name, address), the function always returns full masking regardless of level, as these entities typically should be fully obscured.
+For PDFs, each page is converted to an image and processed separately. Pages with detections are replaced by masked images. Pages without detections are kept as converted page images. If at least one page is redacted, \texttt{img2pdf} combines the pages into a new output PDF.
 
 \section{Overlap Deduplication Logic}
 
-When multiple detection algorithms identify potentially overlapping character ranges, the system must resolve these overlaps to ensure each character is attributed to at most one detection. The overlap deduplication logic implements a greedy algorithm that processes detections in position order, retaining the first detection and comparing subsequent detections against it.
+Overlap deduplication prevents the system from reporting the same character span multiple times. This can happen when a digit sequence is matched by more than one detector or when NER overlaps with a regex detection.
 
-The deduplication algorithm begins by sorting all detections by their start position. This ensures that processing proceeds sequentially through the text. The algorithm then iterates through sorted detections, maintaining a list of retained detections. For each new detection, if it overlaps with any retained detection (specifically, if its start position is less than the end position of the last retained detection), the algorithm compares their confidence scores. The detection with higher confidence replaces the retained one, and if confidence scores are equal, the longer detection is retained. This approach prioritizes high-confidence detections while handling ties by preferring more comprehensive coverage.
+The algorithm sorts all detections by start index. It then compares each detection with the last retained detection. If the two spans overlap, the higher-confidence detection is retained. If both have the same confidence, the longer span is retained. Adjacent spans are not considered overlapping.
 
-The overlap scenario most commonly occurs with nested detections, such as a 12-digit Aadhaar embedded within a longer digit sequence that also passes payment card validation. The deduplication ensures that the character sequence is attributed to the detection with stronger validation (mathematical checksum versus pattern matching). In practice, this typically means Aadhaar detections take precedence over payment card detections when overlap occurs.
-
-The implementation also handles adjacent detections (where one detection ends exactly where another begins) as non-overlapping, preserving both. Only detections that actually share character positions are compared and resolved.
-
-The deduplication logic operates within the detect\_all\_pii function after all individual detectors have processed the text. This centralized approach ensures consistent handling regardless of which specific detectors produced the overlapping detections.
+This rule is intentionally simple. It avoids complicated priority tables and gives deterministic output. A future version could add explicit detector priorities, for example preferring Aadhaar over payment card when a valid Aadhaar is embedded in a longer digit sequence.
 
 \section{Tamper-Evident Audit Logging}
 
-The audit logging system provides a complete record of all document processing operations, implementing tamper-evident logging that enables detection of any attempts to modify historical records. This capability addresses compliance requirements for organizations in regulated industries that must demonstrate proper handling of sensitive documents.
+The audit module writes one JSON object per line to \texttt{audit.log} by default, or to the path set in \texttt{AUDIT\_LOG\_PATH}. Each entry records timestamp, request ID, filename, file type, redaction level, detection counts, pages processed, processing time, action, previous hash, and entry hash.
 
-The audit system uses a hash chain data structure where each log entry contains a cryptographic hash of the previous entry, creating a chain that extends back to the first entry (genesis). If any entry is modified, the hash chain breaks, and verification fails. Similarly, deleting an entry or inserting a new entry between existing entries invalidates the chain, as the hash chain depends on contiguous ordering.
+The hash chain works by storing the previous entry's hash in \texttt{prev\_hash}. The current entry is serialized with sorted keys before the \texttt{hash} field is added, and SHA-256 is computed over that canonical JSON string. The resulting hash is then written into the entry.
 
-The hash computation uses SHA-256, a cryptographic hash function with no known practical attacks. Each entry is serialized to JSON with keys sorted alphabetically to ensure canonical ordering (same logical data always produces identical serialization). The hash of this serialization becomes the entry's hash, stored in the hash field. The prev\_hash field contains the hash of the previous entry, creating the chain linkage. The first entry (genesis) uses a 64-character zero string as its previous hash.
+This design makes later edits detectable if the log is verified in sequence. However, the current implementation keeps the previous hash only in process memory and initializes it to 64 zero characters when the application starts. That means the chain is continuous during a running process, but a production version should read the last existing log entry during startup if it needs an uninterrupted chain across restarts.
 
-The audit entry contains twelve fields capturing all relevant processing information: timestamp (ISO format with timezone), request\_id (UUID for the processing request), filename (original uploaded filename), file\_type (extension of uploaded file), level (redaction level applied), total\_found (number of detections), by\_type (breakdown of detections by type), pages\_processed (number of pages in document), processing\_time\_ms (total processing duration), action (either "redacted" or "no\_pii\_found"), prev\_hash (chain linkage), and hash (computed hash of this entry).
-
-The implementation uses file-based logging in JSON-lines format (one JSON object per line) for simplicity and compatibility. Each new entry is appended to the log file, creating an append-only data structure that further supports tamper detection. Concurrent access is handled through a threading lock that ensures atomic writes even when multiple API requests process simultaneously.
-
-The hash chain verification can be performed by external tools by reading the log file sequentially, computing each entry's hash, and comparing it against the stored hash while following the prev\_hash linkage. Any mismatch indicates tampering. The zero-cost genesis hash ensures the chain has a defined starting point.
-
-This audit system provides the evidentiary basis for compliance demonstrations. Organizations can show regulators that documents were processed through a system with verifiable logging, with each entry's integrity confirmed through hash chain verification.
+Concurrent writes are protected by a threading lock. The audit log stores metadata and detection counts, not the file contents or raw detected values.
 
 \section{System Interfaces and API Design}
 
-The RE-DACT system exposes its functionality through a RESTful API built on FastAPI, providing both programmatic access for integration with other systems and automatic OpenAPI documentation for exploration and testing.
+The REST API exposes three endpoints.
 
-The API defines three primary endpoints. The GET /api/health endpoint returns system status and version information, enabling health checks and monitoring. The response includes version, status, and ner\_available fields indicating whether the optional NER dependencies are installed. The POST /api/process-file endpoint accepts file uploads and returns processing results. This is the primary interface for document processing, accepting multipart form data with the file and optional parameters for redaction level, NER enable/disable, and confidence threshold. The response includes request\_id for retrieving results, stats including detection counts and by-type breakdown, download\_url for the redacted file, and processing\_time\_ms for performance tracking.
+\texttt{GET /api/health} returns application status, version, and whether NER dependencies are available.
 
-The GET /api/result/\{request\_id\} endpoint returns the redacted file for download. This endpoint uses the request\_id from the processing response to retrieve the stored result. The response includes appropriate content-type headers based on the original file format (application/pdf, image/jpeg, or image/png) and provides a download filename with "redacted" prefix.
+\texttt{POST /api/process-file} accepts multipart form data. It requires a file and accepts optional fields for \texttt{level}, \texttt{use\_ner}, and \texttt{confidence\_threshold}. Supported file extensions are PDF, JPG, JPEG, and PNG. Valid redaction levels are \texttt{standard}, \texttt{partial}, and \texttt{full}. Unsupported file types or invalid levels return HTTP 400 errors.
 
-The processing endpoint accepts file uploads in PDF, JPG, JPEG, and PNG formats. Files with other extensions receive a 400 error. The level parameter accepts "standard", "partial", or "full", defaulting to "standard" if not specified. Invalid level values receive a 400 error. The use\_ner parameter accepts boolean values, defaulting to true (NER enabled). The confidence\_threshold parameter accepts float values between 0 and 1, defaulting to 0.85.
+\texttt{GET /api/result/\{request\_id\}} returns the processed file if the result still exists and has not expired. If the result is missing or older than the ten-minute TTL, the endpoint returns HTTP 404.
 
-The in-memory result storage uses a dictionary with request\_id keys and ResultEntry values. Each entry contains the output path, media type, working directory path, and creation timestamp. A time-to-live (TTL) of 600 seconds (10 minutes) ensures automatic cleanup of expired results. The cleanup runs on each new upload, removing entries older than the TTL. This design balances memory usage with practical utility, allowing users sufficient time to download results while preventing unbounded memory growth.
-
-The frontend interface provides a graphical alternative to direct API access. The interface implements a single-page application with drag-and-drop file upload, segmented control for redaction level selection, toggle for NER enable/disable, processing status indicators, results dashboard showing detection statistics, and download capability for redacted files. The interface communicates with the backend exclusively through the defined API endpoints, enabling consistent behavior between programmatic and graphical access.
+The browser interface uses these endpoints directly. It shows total detections, pages processed, processing time, selected redaction level, file type, a detection-type breakdown, a detections table, a preview, and a download link when a redacted file is available.
 
 \section{Summary}
 
-This chapter has presented the comprehensive system design and methodology underlying the RE-DACT platform. The modular architecture enables independent development and testing of components while maintaining coherent system behavior. The mathematical validation algorithms (Verhoeff for Aadhaar, Luhn for payment cards, structural pattern matching for PAN) provide the deterministic detection accuracy that distinguishes the system from pattern-matching-only alternatives.
+The RE-DACT design combines simple pieces: OCR, validation checks, optional NER, character-level masking, temporary result storage, and hash-linked audit entries. The strongest part of the system is structured identifier handling, where Verhoeff and Luhn validation reduce false positives. The more uncertain parts are OCR quality and NER-based unstructured detection, which depend heavily on input quality and model fit.
 
-The multi-orientation OCR pipeline addresses a critical practical challenge in document processing, providing robust handling of rotated documents that causes other systems to fail. The early-exit optimization ensures that typical documents achieve the sub-300ms processing target while the exhaustive testing capability handles worst-case orientations.
-
-The three masking levels provide flexibility for different compliance requirements, and the character-level masking implementation ensures precise control over redaction behavior. The overlap deduplication logic prevents double-counting of detected entities while prioritizing higher-confidence detections.
-
-The tamper-evident audit logging provides the compliance evidentiary capability that organizations in regulated industries require, with cryptographic verification ensuring record integrity. The REST API design enables both programmatic integration and interactive use through the web interface.
-
-The next chapter examines the implementation details, presenting the practical code structure, testing methodology, and measured performance results that validate the design decisions.
+The next chapter explains how this design is implemented, tested, and evaluated in the working application.

@@ -1,29 +1,26 @@
 \chapter{Implementation and Results}
 \section{Implementation Details}
 
-The implementation of the RE-DACT platform follows the architectural design presented in the previous chapter, translating the conceptual design into functional software through carefully structured Python modules, HTML/CSS/JavaScript frontend code, and configuration files.
+The RE-DACT implementation follows the design described in Chapter 3. The codebase is organized into small Python modules and a static browser interface.
 
-The development follows a modular structure where each logical component resides in a dedicated file, enabling independent testing and modification. The main application components are: app.py (FastAPI application and API endpoints), redaction.py (core processing pipeline), detectors.py (PII detection algorithms), ner\_detector.py (optional NER-based detection), audit.py (tamper-evident logging), and the static/ directory containing frontend files.
+The main files are:
 
-The system maintains clean separation between the API layer, processing logic, and detection algorithms. The app.py module handles HTTP request processing, file management, and response formatting. The redaction.py module coordinates the multi-stage pipeline from document input through output generation. The detectors.py module implements pure functions for PII validation with no external dependencies on the web framework. This separation enables testing of core functionality without running the web server and facilitates reuse of detection algorithms in other contexts.
+\begin{enumerate}
+    \item \texttt{app.py}: FastAPI application, file validation, endpoint handling, result TTL storage, and static-file serving.
+    \item \texttt{redaction.py}: OCR, rotation handling, masking, PDF conversion, and output assembly.
+    \item \texttt{detectors.py}: Aadhaar, PAN, payment card, email, phone, overlap filtering, and masking-range logic.
+    \item \texttt{ner\_detector.py}: optional Hugging Face NER pipeline for names and locations.
+    \item \texttt{audit.py}: JSON-lines audit logging with SHA-256 hash chaining.
+    \item \texttt{static/}: HTML, CSS, and JavaScript for the user interface.
+\end{enumerate}
 
-The development uses Python's type hints throughout for code clarity and tooling support. The dataclass pattern for the ResultEntry provides structured storage with automatic initialization. The async/await pattern in FastAPI enables concurrent request handling without thread-blocking.
+The implementation keeps the API, detection logic, and image-processing code separate. This makes the detectors easier to inspect and test because they do not depend on the web layer. The code also uses Python type hints in places where structured values are important, such as the \texttt{ResultEntry} dataclass used for storing downloadable results.
+
+The FastAPI endpoint itself is asynchronous, but the OCR and image processing are CPU-bound operations. In production, concurrency would depend on the number of workers and available CPU resources. The current implementation is suitable for local use and moderate academic testing.
 
 \subsection{Software and Hardware Requirements}
 
-The RE-DACT platform has specific software requirements that must be satisfied for proper operation. The software stack includes system-level dependencies, Python runtime and libraries, and the frontend browser requirements.
-
-The system-level dependencies include Tesseract OCR (version 5.x recommended) and Poppler utilities. Tesseract provides the OCR engine that extracts text from images, while Poppler (specifically the pdftoppm utility) enables conversion of PDF documents to images for processing. On Ubuntu/Debian systems, these are installed via apt-get with the packages tesseract-ocr and poppler-utils. On macOS, Homebrew provides equivalent packages through brew install tesseract poppler. Windows users may need to manually configure Tesseract path settings or use Windows Subsystem for Linux for optimal compatibility.
-
-The Python runtime requires version 3.11 or higher, though the code is compatible with Python 3.9+ with minor adjustments. The required Python packages are specified in requirements.txt and include: fastapi and uvicorn for the web framework, pytesseract for OCR interface, opencv-python-headless for image processing, pdf2image for PDF conversion, img2pdf for PDF assembly, pillow for image file handling, and regex for pattern matching. Optional packages for NER support are transformers and torch, which are installed automatically when available but the system functions without them through graceful fallback.
-
-The frontend works in modern web browsers supporting ES6 JavaScript features, including Chrome (70+), Firefox (62+), Safari (12+), and Edge (79+). No specific browser plugins or extensions are required.
-
-For hardware requirements, the system is designed to run on consumer-grade hardware. The processing pipeline has been tested on machines with 8GB RAM and Intel Core i5 processors or equivalent, achieving the target performance metrics. PDF conversion and OCR are the most computationally intensive operations, and performance scales with available processing power. The system requires approximately 500MB of disk space for code and dependencies, plus temporary space during document processing that is automatically cleaned up.
-
-The memory footprint during operation depends on the size of documents being processed. The in-memory result store holds only the most recent results with automatic cleanup after 10 minutes, ensuring bounded memory usage even under sustained load. The optional NER model requires approximately 400MB additional memory when loaded, which is why it is loaded on-demand rather than at startup.
-
-Table \ref{tab:sw_requirements} summarizes the software requirements.
+The system depends on both Python packages and system tools. Tesseract OCR is required for text recognition. Poppler utilities are required by \texttt{pdf2image} for PDF-to-image conversion. The Python dependencies are listed in \texttt{requirements.txt}.
 
 \begin{table}[htbp]
 \caption{Software Requirements Summary}
@@ -33,88 +30,60 @@ Table \ref{tab:sw_requirements} summarizes the software requirements.
 \hline
 \textbf{Component} & \textbf{Requirement} & \textbf{Notes} \\
 \hline
-Python & 3.11+ & 3.9+ compatible with minor changes \\
+Python & 3.11 recommended & Project code also uses common Python 3.x features \\
 \hline
-Tesseract OCR & 5.x recommended & System package installation required \\
+Tesseract OCR & 5.x recommended & OCR engine used through \texttt{pytesseract} \\
 \hline
-Poppler & Latest & pdftoppm needed for PDF conversion \\
+Poppler & Installed system utility & Required for PDF conversion \\
 \hline
-FastAPI & 3.0.0+ & Web framework \\
+FastAPI & 0.100.0+ & Web framework listed in requirements \\
 \hline
-OpenCV & 4.10.0+ & Headless variant for server deployment \\
+OpenCV & 4.10.0+ & Headless build used for image operations \\
 \hline
-Memory (base) & 2GB+ & Without NER support \\
+pdf2image & 1.16.3+ & Converts PDF pages to images \\
 \hline
-Memory (+NER) & 4GB+ & With optional NER enabled \\
+img2pdf & 0.5.1+ & Rebuilds redacted PDF output \\
 \hline
-Disk Space & 500MB+ & Plus temporary processing space \\
+transformers, torch & Optional & Needed only for NER support \\
 \hline
 \end{tabular}
 \end{table}
 
-The system is designed for single-machine deployment and does not require distributed computing resources. For enterprise deployment with high throughput requirements, containerization with horizontal scaling through a task queue represents a planned enhancement rather than current implementation.
+For normal image processing, a consumer laptop with 8 GB RAM is sufficient. Optional NER support needs more memory because the BERT model and PyTorch runtime must be loaded. Processing time depends mainly on OCR, page count, image quality, and whether the first orientation produces a detection.
 
 \subsection{Assumptions and Dependencies}
 
-The implementation assumes certain conditions about the input documents and processing environment. These assumptions affect the system's behavior and define the expected usage scenarios.
+The system assumes that documents contain printed or typed text. Handwritten identifiers are outside the current scope. OCR quality also depends on resolution, contrast, blur, glare, font style, and background design.
 
-The system assumes input documents contain printed or typed text rather than handwritten content. OCR accuracy for handwriting is significantly lower than for printed text, and the detection algorithms are optimized for the character shapes typical of printed identity documents. Documents with substantial handwritten content may produce lower detection accuracy.
+The default OCR language is English (\texttt{-l eng}). This works for alphanumeric identifiers such as Aadhaar, PAN, and payment cards, but it does not provide full support for Indian-language text. Documents containing Devanagari, Tamil, Telugu, Kannada, or other scripts would need extra Tesseract language configuration and validation work.
 
-The system assumes reasonable image quality for OCR processing. Documents that are severely blurred, extremely low resolution, or heavily degraded may produce OCR output with character recognition errors that affect detection accuracy. The multi-orientation pipeline's Gaussian blur preprocessing provides some noise reduction but cannot compensate for fundamental image quality issues.
+The upload endpoint accepts PDF, JPG, JPEG, and PNG files. It does not currently enforce an explicit maximum file size. Result files are held in temporary folders and are available for ten minutes through \texttt{/api/result/\{request\_id\}}. After expiry, cleanup removes the temporary directory.
 
-The system assumes English-language text for the default OCR configuration. While Tesseract supports many languages, the current implementation uses English language recognition (-l eng parameter), which is appropriate for the alphanumeric content on Indian identity documents but may not accurately recognize text in other languages.
+The audit log is append-only in normal operation, but the current hash chain is initialized when the process starts. A deployment that needs an unbroken audit chain across restarts should load the last hash from the existing log at startup.
 
-The implementation depends on specific versions of external libraries as specified in requirements.txt. Version compatibility is maintained through pinned minimum versions, though newer versions are generally compatible. The system handles missing optional dependencies (transformers and torch for NER) gracefully, falling back to rule-based detection when these packages are unavailable.
+\subsection{Current Constraints}
 
-The file system assumptions include writable temporary directory for processing files, which tempfile.mkdtemp() handles automatically in the working directory. The audit log path defaults to ./audit.log in the current directory but can be overridden through the AUDIT\_LOG\_PATH environment variable.
+The implementation has several known constraints:
 
-The concurrency model assumes single-process operation with async handling of concurrent requests through FastAPI's async/await implementation. For production deployment requiring multiple worker processes, the deployment configuration (such as Gunicorn with multiple workers) would need to ensure proper setup for hash chain consistency across workers.
+\begin{enumerate}
+    \item OCR errors can cause missed detections.
+    \item Spaced or dashed Aadhaar and PAN values are not normalized before detection.
+    \item PAN validation checks structure and holder-type character only; it does not verify issuance.
+    \item NER is optional and domain-sensitive.
+    \item Results are stored in memory for download lookup, so a process restart clears active download links.
+    \item There is no batch-processing queue, rate limit, user authentication, or persistent job database.
+    \item The audit chain is process-continuous, not restart-continuous, in the current code.
+\end{enumerate}
 
-Constraints on the current implementation include a 10-minute result TTL that auto-cleans expired results, maximum file size limited by available memory rather than explicit configuration, and no explicit rate limiting on API endpoints. These constraints represent reasonable defaults for the initial deployment while providing tuning knobs for specific requirements.
-
-The detection confidence threshold defaults to 0.85 for NER-based detections, a value that balances precision against recall based on empirical testing. Users can adjust this through the confidence\_threshold API parameter to optimize for their specific document types.
-
-The implementation assumes proper locale configuration for JSON serialization to ensure consistent hash computation across different system locales. The sorted keys JSON serialization ensures canonical ordering regardless of insertion order.
-
-The frontend JavaScript assumes same-origin API access. Cross-origin requests require CORS configuration through the FastAPI middleware, which is enabled by default to allow access from the served static files.
-
-These assumptions and dependencies define the operational envelope within which the system performs as expected. Operating outside these assumptions may require system modifications or result in degraded performance.
-
-\subsection{Constraints (If Applicable)}
-
-The current implementation operates under several constraints that affect its applicability to certain scenarios.
-
-The processing time constraint directly relates to document complexity. While the system achieves sub-300ms processing for single-page images with correctly oriented text, the processing time increases substantially for multi-page PDFs, rotated documents, and images requiring extensive orientation testing. Users with time-sensitive workflows should consider these performance characteristics when integrating the system.
-
-The file format support constraint limits the system to PDF, JPG, JPEG, and PNG formats. Other document formats including Word documents, text files, and images in other formats are not supported in the current implementation. Multi-page TIFF images also fall outside current support.
-
-The NER capability constraint means that when transformers and torch are not installed, the system operates without Named Entity Recognition capability. While rule-based detection remains fully functional, the detection coverage for unstructured PII is reduced.
-
-The memory constraint from the in-memory result store limits the practical window for result retrieval. The 10-minute TTL may require users to download results promptly, though this aligns with the security principle of not persisting sensitive documents beyond processing.
-
-The deployment constraint of single-machine operation limits horizontal scaling in the base implementation. For high-volume processing requirements, additional infrastructure configuration would be necessary beyond the scope of the current release.
-
-The OCR accuracy constraint means that documents with non-standard fonts, unusual character spacing, or degraded print quality may produce suboptimal results. The system handles these cases as gracefully as possible but cannot overcome fundamental limitations in character recognition.
-
-These constraints represent known limitations that are addressed through planned enhancements in future versions rather than blocking issues for the primary use cases the system targets.
+These constraints are acceptable for a focused academic prototype, but they should be addressed before using the system in a high-volume or regulated production setting.
 
 \section{Results}
 
-The empirical evaluation of the RE-DACT system examines detection accuracy, processing performance, and operational characteristics through systematic testing on real Indian identity documents.
+The evaluation used a small set of sample documents containing Aadhaar, PAN, payment card, email, phone, name, and address-like content. Each file was processed through the complete pipeline, and the output was manually checked against the expected detections. Because the dataset is small, the results should be read as prototype evidence rather than a broad accuracy claim.
 
-The test dataset comprises actual identity documents processed through the system, including Aadhaar cards in various orientations, PAN cards with different background complexity, payment card images from various sources, and mixed documents containing multiple PII types. All testing uses the production deployment configuration with default parameters unless specifically noted for parameter sensitivity analysis.
+Aadhaar detection performed best on clear images. The Verhoeff checksum rejected invalid 12-digit sequences and reduced false positives. PAN and payment card detection depended more heavily on OCR quality. PAN cards with clean text were detected more reliably than images with complex backgrounds or stylized fonts. Payment card detection worked when the card number was read correctly and passed the Luhn check.
 
-The test methodology involves processing each document through the complete pipeline, recording detection results and processing time, then manually verifying detection accuracy against ground truth. The processing includes file upload, PDF conversion where applicable, multi-orientation OCR, PII detection with validation, coordinate masking, and output generation. All timing measurements capture the complete pipeline from API request receipt to response generation.
-
-The detection results demonstrate strong performance across PII types. The Aadhaar detection achieves 100\% true positive rate on documents with clear, readable Aadhaar numbers. All test documents containing valid Aadhaar numbers were correctly identified and redacted across all three masking levels. The Verhoeff validation effectively rejects false positives; no non-Aadhaar 12-digit numbers passed validation. The additional filter rejecting numbers ending in 1947 successfully eliminates common false positives from year references in documents.
-
-The PAN card detection shows more variable results depending on document quality. For test documents with clean PAN card images (minimal background graphics, clear text), detection succeeds reliably. For documents with complex card designs (background watermarks, colorful graphics, stylized fonts), OCR accuracy degrades and some valid PAN numbers are not detected. This limitation stems from Tesseract's difficulty with non-standard visual presentation rather than algorithmic issues with the detection logic.
-
-The payment card detection shows moderate performance. Valid payment card numbers are correctly validated through the Luhn algorithm when the OCR output is accurate. False positive rejection through Luhn validation proves effective for random 13-19 digit sequences.
-
-The NER-based detection for names and addresses provides capability for unstructured PII when the optional dependencies are installed. The detection quality depends on OCR text quality and the specific entity types present in documents. PERSON entities are detected with reasonable accuracy when names appear clearly in the text. LOCATION entities show more variation depending on how addresses are formatted in the OCR output.
-
-Table \ref{tab:detection_results} summarizes detection results across test documents.
+Email and phone detection worked well on simple text because both rely on direct regex patterns. NER detections were more variable. Names were easier to detect than full addresses, which is expected because the selected BERT NER model is trained on general English NER categories, not postal-address extraction from OCR output.
 
 \begin{table}[htbp]
 \caption{Detection Results Summary}
@@ -123,258 +92,154 @@ Table \ref{tab:detection_results} summarizes detection results across test docum
 \resizebox{\textwidth}{!}{
 \begin{tabular}{|l|c|c|c|p{4.5cm}|}
 \hline
-\textbf{PII Type} & \textbf{Test Docs} & \textbf{Detected} & \textbf{Accuracy} & \textbf{Notes} \\
+\textbf{PII Type} & \textbf{Test Docs} & \textbf{Detected} & \textbf{Recorded Accuracy} & \textbf{Notes} \\
 \hline
-Aadhaar & 5 & 5 & 100\% & Full validation success \\
+Aadhaar & 5 & 5 & 100\% & Clear readable text; Verhoeff validation used \\
 \hline
-PAN Card & 4 & 2 & 50\% & OCR challenges with complex backgrounds \\
+PAN Card & 4 & 2 & 50\% & OCR struggled with complex card backgrounds \\
 \hline
-Payment Card & 3 & 2 & 67\% & Depends on OCR accuracy \\
+Payment Card & 3 & 2 & 67\% & Depends on clean OCR and Luhn validation \\
 \hline
-Email (regex) & 3 & 3 & 100\% & Simple pattern matching \\
+Email & 3 & 3 & 100\% & Regex-based detection \\
 \hline
-Phone (regex) & 3 & 3 & 100\% & Simple pattern matching \\
+Phone & 3 & 3 & 100\% & Regex-based Indian phone pattern \\
 \hline
-NER Names & 3 & 2 & 67\% & Requires clear text output \\
+NER Names & 3 & 2 & 67\% & Optional BERT NER; depends on OCR text \\
 \hline
-NER Addresses & 3 & 1 & 33\% & Format variation affects detection \\
+NER Address/Location & 3 & 1 & 33\% & Address format variation affects detection \\
 \hline
 \end{tabular}}
 \end{table}
 
-The processing time results demonstrate the performance impact of the early-exit optimization and the multi-orientation scanning capability. For correctly oriented documents with clear text, the first preprocessing variant produces detections, and processing completes in under 300ms for single-page images. This performance meets the target specification established during system design.
-
-For documents requiring multiple orientation attempts, processing time increases proportionally. The worst-case scenario of documents requiring all eight orientations (no PII detected in early attempts) shows processing times up to 1582ms. While this represents a 5× increase over the best case, the comprehensive scanning ensures that rotated documents are not missed, and the early-exit optimization ensures typical documents do not incur this cost.
-
-Table \ref{tab:timing_results} presents processing time measurements for the test documents.
+Processing time reflected the early-exit design. Correctly oriented Aadhaar images were processed in 274--296 ms in the recorded tests. Harder cases took longer because the pipeline had to try more OCR variants.
 
 \begin{table}[htbp]
-caption{Processing Time Results}
+\caption{Processing Time Results}
 \label{tab:timing_results}
 \centering
-\begin{tabular}{|l|c|c|c|c|}
+\begin{tabular}{|l|c|c|c|p{4cm}|}
 \hline
 \textbf{Document} & \textbf{Type} & \textbf{Time (ms)} & \textbf{Detections} & \textbf{Notes} \\
 \hline
-Aadhaar-1 & PNG & 296 & 1 & Early-exit successful \\
+Aadhaar-1 & PNG & 296 & 1 & Early exit after first useful OCR attempt \\
 \hline
-Aadhaar-2 & PNG & 274 & 1 & Early-exit successful \\
+Aadhaar-2 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
 \hline
-Aadhaar-3 & PNG & 274 & 1 & Early-exit successful \\
+Aadhaar-3 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
 \hline
-PAN-Card-1 & JPG & 1582 & 0 & All orientations tested \\
+PAN-Card-1 & JPG & 1582 & 0 & OCR attempts completed without detection \\
 \hline
-Screenshot-Aadhaar & JPG & 304 & 1 & Early-exit successful \\
+Screenshot-Aadhaar & JPG & 304 & 1 & Slightly slower but still near target range \\
 \hline
-Credit-Card-1 & PNG & 699 & 0 & Multi-orientation required \\
+Credit-Card-1 & PNG & 699 & 0 & Multiple OCR attempts required \\
 \hline
 \end{tabular}
 \end{table}
 
-The comparison of redaction levels shows consistent application across all levels. For the same document, standard masking produces XXXXXXXX9012, partial produces XXXX56789012, and full produces XXXXXXXXXXXX, where the X characters represent correctly placed black rectangles over each character. The character-level masking precisely applies the selected level without affecting surrounding text.
+Masking output matched the implementation. For a 12-character identifier such as \texttt{123456789012}, standard masking produces \texttt{XXXXXXXX9012}, partial masking produces \texttt{XXXX56789012}, and full masking produces \texttt{XXXXXXXXXXXX}. The same masking ranges are used for drawing black rectangles on the image.
 
-The audit logging verification confirms proper hash chain construction. Each log entry contains the correct prev\_hash linking to the previous entry, and the hash field contains the SHA-256 hash of the entry's contents. The genesis entry correctly uses the 64-character zero string as its previous hash. Verification of the log chain through external computation confirms hash validity across all entries.
+For multi-page PDFs, the system processes each converted page separately and records the page number for each detection. If only one page contains PII, the redaction is applied to that page while the other converted pages are carried into the output PDF.
 
-The multi-page PDF handling maintains document structure through conversion and reconstruction. A three-page PDF with an Aadhaar number on page 2 produces a three-page output PDF with redaction applied only to page 2, preserving pages 1 and 3 in their original form.
+\subsection{Interface Snapshots and Result Views}
 
-These results demonstrate that the implementation achieves the design objectives for detection accuracy, processing performance, and functional capability across the feature set.
+The browser interface supports drag-and-drop upload, file removal, redaction-level selection, an NER toggle, and a process button. After processing, it shows the total number of detections, pages processed, processing time, selected level, and file type.
 
-\subsection{Snapshots Of Interfaces/ Results}
+The results section includes a detection breakdown by type and a table showing the detected entity type, masked value, and page number. When a redacted file is available, the interface shows a preview and a download button. For PDFs, the preview is displayed in an iframe. For image inputs, the redacted image is shown directly.
 
-The web interface provides a comprehensive view of processing results through a dashboard-style presentation. The interface displays key metrics including the total number of PII detections found, the number of pages processed, processing time in milliseconds, the redaction level applied, and the original file type.
+When no PII is found, the API returns a successful response with \texttt{download\_url} set to null and a message saying that no PII was found. The interface treats this as a clean result rather than an error.
 
-The detection breakdown visualization uses a segmented bar representation showing the count of each PII type detected. The bars are color-coded by type (using consistent colors across all visualizations) and labeled with the count value. This enables quick assessment of the document's PII composition at a glance.
+Error cases are handled through HTTP status codes and UI messages. Unsupported file types and invalid redaction levels return HTTP 400. Processing failures return HTTP 500 with the error detail generated by the backend.
 
-When detections are found, a detailed table shows each detection including the type (Aadhaar, PAN, payment card, email, phone, name, address), the masked value showing the redaction result (e.g., XXXXXXXX9012 for standard Aadhaar masking), and the page number for multi-page documents. This detailed view enables verification that redaction was applied correctly.
+\subsection{Test Cases}
 
-The preview section displays the redacted document image (for image inputs) or the first page of the redacted PDF (for PDF inputs). A download button enables saving the processed file. The preview updates automatically when processing completes, providing immediate confirmation of the output quality.
-
-The interface handles the no-PII-found case appropriately, displaying a clean message indicating that no sensitive information was detected. This helps users understand that processing completed successfully but no redaction was necessary. The interface does not suggest an error occurred when no detections are found, as this is a valid outcome for documents without sensitive information.
-
-For error handling, the interface displays error messages for unsupported file types, invalid redaction levels, and processing failures. Errors from OCR issues, missing dependencies, or other problems are reported clearly to help users understand and resolve issues.
-
-The JSON API response structure provides programmatic access to all information displayed in the UI. The stats dictionary contains total\_detections, by\_type dictionary, pages\_processed, and detections array with per-item details. This enables integration with automated systems that consume the JSON response rather than interacting through the browser interface.
-
-The audit log files maintain a complete record suitable for compliance review. Each entry contains timestamp, request details, detection statistics, and processing metadata. The hash chain enables verification that logs have not been tampered with, providing evidentiary capability for regulatory audits.
-
-Test case documentation captures the system behavior across various scenarios. The test cases cover standard inputs (correct document with expected PII), edge cases (rotated documents, low-quality images, no PII), and error conditions (unsupported formats, invalid parameters). Each test case documents the input, expected output, and actual result.
-
-Figure references for interface snapshots would include the upload interface showing drag-and-drop zone and redaction level selector, the results dashboard showing detection breakdown and statistics, the detailed detection table showing masked values, and the download interface showing the redacted document preview.
-
-The visual documentation of these interface elements provides evidence of the complete system functionality and supports user documentation for the deployed system.
-
-\subsection{Test Cases(If Applicable)}
-
-The test methodology applies structured test cases to validate system behavior across expected inputs and edge cases. Each test case specifies the input, expected outcome, and acceptance criteria.
-
-The positive test cases verify correct behavior for valid inputs. Test Case 1 uses a clear PNG image containing a valid Aadhaar number with standard orientation, expecting detection of 1 Aadhaar with standard masking (last 4 visible). Test Case 2 uses a PDF with one page containing a valid Aadhaar, expecting detection and redaction applied to the single page. Test Case 3 uses an image with multiple PII types (Aadhaar and phone number), expecting both types detected and redacted. Test Case 4 tests the partial masking level, expecting first 4 characters visible and remaining masked. Test Case 5 tests the full masking level, expecting all characters masked.
-
-The negative test cases verify proper handling of inputs without PII. Test Case 6 uses a document with no Aadhaar, PAN, or payment card numbers, expecting zero detections and appropriate message. Test Case 7 uses a random 12-digit number (not valid Aadhaar), expecting zero detections due to Verhoeff validation rejecting invalid checksums. Test Case 8 uses an image with only names and addresses (if NER enabled), documenting the detection coverage for unstructured PII.
-
-The error test cases verify proper error handling. Test Case 9 attempts to upload a Word document (.docx), expecting 400 error for unsupported format. Test Case 10 uses an invalid redaction level value, expecting 400 error for invalid parameter. Test Case 11 uses a corrupted image file, expecting 500 error with appropriate message.
-
-The orientation test cases verify multi-orientation capability. Test Case 12 uses a 90° rotated Aadhaar image, expecting successful detection. Test Case 13 uses a 180° rotated image, expecting successful detection. Test Case 14 uses an upside-down image, expecting successful detection after exhaustive scanning.
-
-The performance test cases verify timing characteristics. Test Case 15 measures processing time for standard document, expecting under 300ms (early-exit case). Test Case 16 measures processing time for document requiring all orientations, expecting under 2000ms (worst-case bound).
-
-Table \ref{tab:test_cases} summarizes the test case execution results.
+The test cases cover expected inputs, negative cases, error handling, orientation handling, and timing. The table below summarizes the recorded manual test execution.
 
 \begin{table}[htbp]
 \caption{Test Case Execution Summary}
 \label{tab:test_cases}
 \centering
 \resizebox{\textwidth}{!}{
-\begin{tabular}{|l|c|c|c|c|}
+\begin{tabular}{|l|p{4cm}|p{4cm}|p{4cm}|c|}
 \hline
 \textbf{Test Case} & \textbf{Input} & \textbf{Expected} & \textbf{Actual} & \textbf{Status} \\
 \hline
-TC-01 & Clear Aadhaar PNG & 1 detection & 1 detection & Pass \\
+TC-01 & Clear Aadhaar PNG & One Aadhaar detection & One Aadhaar detection & Pass \\
 \hline
-TC-02 & Single-page PDF & Redaction applied & Redaction applied & Pass \\
+TC-02 & Single-page PDF & Redaction applied to PDF output & Redaction applied & Pass \\
 \hline
-TC-03 & Multiple PII types & All detected & All detected & Pass \\
+TC-03 & Multiple PII types & All readable supported types detected & All expected readable types detected & Pass \\
 \hline
-TC-04 & Partial masking & First 4 visible & First 4 visible & Pass \\
+TC-04 & Partial masking & First four characters masked & First four characters masked & Pass \\
 \hline
-TC-05 & Full masking & All masked & All masked & Pass \\
+TC-05 & Full masking & All characters masked & All characters masked & Pass \\
 \hline
-TC-06 & No PII document & 0 detections & 0 detections & Pass \\
+TC-06 & No-PII document & Zero detections & Zero detections & Pass \\
 \hline
-TC-07 & Invalid Aadhaar & 0 detections & 0 detections & Pass \\
+TC-07 & Invalid Aadhaar & Rejected by Verhoeff validation & Rejected & Pass \\
 \hline
-TC-08 & Names/addresses & NER detections & NER detections & Pass \\
+TC-08 & Names/locations with NER enabled & NER detections where confidence is high & NER detections returned & Pass \\
 \hline
-TC-09 & Word document & 400 error & 400 error & Pass \\
+TC-09 & Word document & HTTP 400 unsupported file type & HTTP 400 & Pass \\
 \hline
-TC-10 & Invalid level & 400 error & 400 error & Pass \\
+TC-10 & Invalid level & HTTP 400 invalid level & HTTP 400 & Pass \\
 \hline
-TC-11 & Corrupted file & 500 error & 500 error & Pass \\
+TC-11 & Corrupted image & Processing error response & HTTP 500 & Pass \\
 \hline
-TC-12 & 90° rotated & Detection success & Detection success & Pass \\
+TC-12 & 90-degree rotated Aadhaar & Detection after orientation handling & Detection returned & Pass \\
 \hline
-TC-13 & 180° rotated & Detection success & Detection success & Pass \\
+TC-13 & 180-degree rotated Aadhaar & Detection after orientation handling & Detection returned & Pass \\
 \hline
-TC-14 & Upside-down & Detection success & Detection success & Pass \\
+TC-14 & Upside-down Aadhaar & Detection after orientation handling & Detection returned & Pass \\
 \hline
-TC-15 & Standard time & Under 300ms & 274-296ms & Pass \\
+TC-15 & Standard Aadhaar timing & Around or below 300 ms & 274--296 ms & Pass \\
 \hline
-TC-16 & Worst-case time & Under 2000ms & 1582ms & Pass \\
+TC-16 & Difficult orientation/no-detection case & Under 2000 ms & 1582 ms & Pass \\
 \hline
 \end{tabular}}
 \end{table}
 
-The test execution confirms that all test cases pass, providing confidence in system correctness across the operational envelope. The test cases cover the primary functionality, error handling, orientation handling, and performance characteristics.
-
-Additional automated testing through pytest or similar frameworks would provide ongoing regression prevention as the system evolves. The modular code structure enables isolated unit testing of detection algorithms independent of the full pipeline.
-
-The test results support the conclusion that the implementation achieves the functional requirements established during system design.
+The test set is not large enough to claim production-level accuracy. It does show that the implemented pipeline works as intended across the main feature paths.
 
 \subsection{Performance Evaluation}
 
-The performance evaluation examines processing speed, resource utilization, and scalability characteristics of the RE-DACT system.
+OCR dominates processing time. The checksum and regex detectors run quickly compared with Tesseract. The early-exit design is therefore important: a normal upright image can complete after the first OCR pass, while a difficult image may require several attempts.
 
-The processing speed measurements demonstrate the impact of key design decisions. The early-exit optimization provides dramatic speedup for typical documents. Processing correctly oriented Aadhaar images completes in 274-296ms, representing the case where PII is detected on the first preprocessing variant and subsequent orientations are never attempted. This achieves the sub-300ms target established in the design objectives.
+For image files, processing time depends on resolution and OCR quality. For PDFs, time increases with page count because each page is converted and processed separately. The current implementation processes PDF pages sequentially. Parallel page processing is a possible future optimization.
 
-The processing time increases for documents requiring multiple orientation attempts. The worst-case of exhaustive scanning through all eight orientations reaches 1582ms for the PAN card sample that failed detection. This represents approximately a 5× increase over the best case but remains within acceptable bounds for the comprehensive scanning capability. Users processing predominantly rotated documents should expect higher average processing times.
+NER adds substantial overhead when enabled. The model is preloaded at startup if dependencies are available, which reduces first-request delay, but inference still takes longer than rule-based detection. Users who only need structured identifier redaction can disable NER through the UI or API.
 
-Multi-page PDF processing scales linearly with page count. A three-page PDF with one page containing Aadhaar processes three pages in approximately 900ms (300ms per page), with the total including overhead for PDF conversion and assembly. The per-page processing time remains consistent regardless of total page count.
-
-Memory usage during processing depends on input document size. Single-page images use minimal memory (typically under 50MB including all processing artifacts). Multi-page PDFs temporarily use more memory during conversion (the pdf2image library holds all page images in memory before processing), but peak memory remains bounded for typical document sizes. The result caching uses limited memory (storing only processed output paths) and the automatic TTL cleanup prevents memory accumulation over time.
-
-CPU utilization during processing shows high single-core usage during OCR operations. The OpenCV image processing is CPU-bound, while the Python detection algorithms complete quickly relative to OCR. On multi-core systems, the single-threaded processing leaves cores available for concurrent requests. The FastAPI async model handles concurrent requests efficiently, with each request processing on the event loop.
-
-The API throughput measurement under single-user sequential operation shows approximately 3-4 requests per second for typical documents (sub-300ms processing each). Under concurrent load, the system can handle multiple simultaneous requests up to the CPU capacity limit, with each request's processing time remaining consistent regardless of concurrency level (assuming sufficient CPU resources).
-
-The NER feature adds significant processing overhead when enabled. The initial model loading takes 2-3 seconds on first use (with caching for subsequent requests), and each NER inference requires 1-3 seconds depending on text length. This overhead is why NER remains optional and can be disabled through the use\_ner parameter for applications not requiring unstructured PII detection.
-
-The audit logging adds minimal overhead (microseconds per entry) due to the lightweight JSON serialization and SHA-256 hash computation. This overhead is negligible relative to document processing time and does not affect overall performance meaningfully.
-
-Scalability considerations for production deployment include the single-machine memory limit for result caching and the per-request processing time. For high-volume deployments, containerization with multiple workers would provide horizontal scaling capability. The current implementation is optimized for single-machine deployment with moderate usage levels.
-
-The performance comparison with existing solutions (Table \ref{tab:perf_comparison}) shows RE-DACT achieves competitive or superior processing times while providing unique features including checksum validation and tamper-evident logging.
+Audit logging adds little overhead compared with OCR. It performs JSON serialization and SHA-256 hashing for one metadata entry per request.
 
 \begin{table*}[htbp]
-\caption{Performance Comparison with Existing Solutions}
-\label{tab:perf_comparison}
-\centering
-\resizebox{\textwidth}{!}{
-\begin{tabular}{|l|c|p{5cm}|p{3.5cm}|}
-\hline
-\textbf{Solution} & \textbf{Typical Processing Time} & \textbf{Unique Features} & \textbf{Notes} \\
-\hline
-RE-DACT & 274-1582ms & Checksum validation, multi-orientation, audit logging & Open-source, Indian PII focus \\
-\hline
-Adobe Acrobat Pro & 500-2000ms & Established tooling & Commercial, subscription required \\
-\hline
-Microsoft Presidio & 300-1500ms & NER-based detection & Open-source, Western PII focus \\
-\hline
-iDox.ai & 400-1200ms & Commercial API & Cloud-based, privacy concerns \\
-\hline
-Manual Redaction & 5-15 min/page & Human verification & Labor-intensive, error-prone \\
-\hline
-\end{tabular}}
-\end{table*}
-
-The performance characteristics enable the system to handle production workloads effectively. The combination of competitive processing speed with unique features (checksum validation, multi-orientation robustness, audit logging) provides value not available in existing alternatives.
-
-The resource utilization remains bounded through automatic cleanup and TTL management. The system achieves the design goal of zero-data-retention, with processed documents existing only in transient storage during the processing window. This addresses the primary security concern for organizations handling sensitive documents.
-
-Performance optimization opportunities for future consideration include GPU acceleration for OCR (using CUDA-enabled Tesseract), parallel page processing for multi-page PDFs, caching of OCR results for repeated processing of identical documents, and distributed processing for high-volume deployments. These optimizations would improve performance for specific use cases while the current implementation provides adequate performance for typical deployment scenarios.
-
-The empirical performance results validate the design decisions and demonstrate that the system achieves its performance objectives while providing the unique features that distinguish it from existing solutions.
-
-\subsection{Comparison with Existing State-of-the-Art Technologies}
-
-The comparison with existing redaction technologies examines feature capabilities, detection accuracy, and deployment characteristics across multiple dimensions.
-
-The feature comparison in Table \ref{tab:feature_comparison} summarizes capabilities across key dimensions. RE-DACT provides algorithmic checksum validation (Verhoeff for Aadhaar, Luhn for payment cards) that no other solution includes. The multi-orientation OCR with eight preprocessing combinations is unique to RE-DACT. The tamper-evident audit logging with SHA-256 hash chains provides compliance capability not found in comparable tools. The Indian PII support (Aadhaar, PAN) is specific to this system, while other tools focus on Western formats. The open-source availability enables customization and zero licensing costs. The sub-second processing matches commercial tools. The web-based interface provides accessibility comparable to commercial cloud solutions. The configurable masking levels offer flexibility not available in all tools. The zero-data-retention architecture ensures document privacy.
-
-\begin{table*}[htbp]
-\caption{Feature Comparison with Existing Redaction Solutions}
+\caption{Qualitative Comparison with Related Redaction Approaches}
 \label{tab:feature_comparison}
 \centering
 \resizebox{\textwidth}{!}{
-\begin{tabular}{|l|c|c|c|c|c|}
+\begin{tabular}{|l|c|c|c|c|}
 \hline
-\textbf{Feature} & \textbf{RE-DACT} & \textbf{Adobe Acrobat} & \textbf{iDox.ai} & \textbf{MS Presidio} & \textbf{Manual} \\
+\textbf{Capability} & \textbf{RE-DACT} & \textbf{Adobe Acrobat Pro} & \textbf{Microsoft Presidio} & \textbf{Manual Redaction} \\
 \hline
-Checksum Validation & Yes & No & No & No & N/A \\
+Aadhaar Verhoeff validation & Yes & No built-in Indian-specific flow & Custom recognizer required & Depends on reviewer \\
 \hline
-Multi-Orientation OCR & Yes & No & No & No & N/A \\
+PAN structure validation & Yes & No built-in Indian-specific flow & Custom recognizer required & Depends on reviewer \\
 \hline
-Tamper-Evident Audit & Yes & No & Partial & No & N/A \\
+Payment card Luhn validation & Yes & Available through search/manual tools & Yes for credit-card recognizer & Depends on reviewer \\
 \hline
-Indian PII (Aadhaar/PAN) & Yes & No & No & Partial & Yes \\
+Multi-orientation OCR attempts & Yes & Not the focus of the tool & Not the core text analyzer's role & Reviewer dependent \\
 \hline
-Open Source & Yes & No & No & Yes & N/A \\
+Tamper-evident audit metadata & Basic hash chain & Product logging depends on setup & Not built in as a hash chain & Manual records only \\
 \hline
-Sub-second Processing & Yes & Yes & Yes & Yes & No \\
+Local web API & Yes & No & Yes as a framework & No \\
 \hline
-Web Interface & Yes & No & Yes & No & N/A \\
-\hline
-Configurable Levels & Yes & Limited & No & Yes & Yes \\
-\hline
-Zero-Data-Retention & Yes & Unknown & Unknown & Yes & N/A \\
+No permanent document storage by default & Yes, short temporary TTL & Local file handling & Depends on integration & Depends on process \\
 \hline
 \end{tabular}}
 \end{table*}
 
-The detection accuracy comparison shows RE-DACT's mathematical validation achieving near-zero false positive rates for structured PII types. Pattern-matching approaches used by other tools produce higher false positive rates on well-structured identifiers like Aadhaar numbers. The NER-based detection in Microsoft Presidio provides broader entity coverage but without the validation certainty of mathematical algorithms.
-
-The deployment comparison shows RE-DACT's advantage for organizations requiring on-premises deployment without cloud data transmission. The open-source model eliminates licensing costs while the comprehensive feature set reduces the need for multiple tools. Commercial tools like Adobe and iDox require ongoing subscription costs while providing less specialized functionality for Indian documents.
-
-The development model comparison shows RE-DACT's integration potential. The REST API enables programmatic integration with document management systems, workflow engines, and custom applications. The modular architecture supports customization for specific organizational requirements. The audit logging provides compliance evidence for regulated industries.
-
-The limitations of the current implementation compared to commercial tools include narrower format support (commercial tools handle more document types), less mature integration ecosystem (fewer pre-built connectors), and smaller development community (fewer contributors and extensions). However, these limitations are outweighed by the unique capabilities for the specific use case of Indian identity document redaction.
-
-The unique contribution of RE-DACT lies in combining features that no existing solution provides together: mathematical checksum validation for detection accuracy, multi-orientation scanning for document robustness, cryptographic audit logging for compliance, specialized detection for Indian PII types, and open-source accessibility for adoption flexibility. This combination addresses a specific gap in the existing solution landscape and provides practical value for organizations processing Indian identity documents.
-
-The comparison supports the conclusion that RE-DACT provides meaningful advancement over existing alternatives for the targeted use case, while acknowledging that other tools may be more appropriate for different requirements.
+The comparison shows where RE-DACT is useful: local processing, Indian structured identifiers, and OCR-to-mask output. It is not a replacement for mature PDF editing suites or a full PII-detection platform. It is a focused prototype for a specific redaction workflow.
 
 \section{Summary}
 
-This chapter has presented the implementation details and empirical results for the RE-DACT platform. The software requirements, assumptions, and constraints define the operational envelope within which the system performs as designed. The test case execution demonstrates correct behavior across the functional requirements. The performance evaluation confirms achievement of the sub-300ms processing target for typical documents while maintaining comprehensive scanning capability for challenging cases.
+The implementation translates the design into a working FastAPI application with a browser interface. The recorded tests show strong Aadhaar performance on clear inputs, more variable PAN/payment-card performance when OCR is challenged, and optional NER behavior that depends on text quality and model fit.
 
-The comparison with existing solutions shows that RE-DACT provides unique capabilities not available elsewhere, particularly the combination of checksum validation, multi-orientation handling, and tamper-evident logging. These features address gaps in the existing solution landscape for Indian identity document processing.
-
-The empirical results validate the design decisions and confirm that the implementation achieves the functional and performance objectives established during system design. The next chapter presents the conclusions and directions for future work.
+The main engineering strengths are the simple module boundaries, validation-based structured detection, multi-orientation OCR, and short-lived result storage. The main limitations are OCR sensitivity, limited input formats, lack of batch infrastructure, and audit-chain continuity across restarts. The next chapter summarizes the project and outlines future work.
