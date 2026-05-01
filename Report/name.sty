@@ -1,0 +1,26 @@
+\renewcommand{\@makechapterhead}[1]{{
+    \setlength{\topmargin}{50mm}   % really 1.5in, added by bph                              % to meet OAP standards
+    \normalfont\normalsize\bfseries  %the size of the font of the headers   of the chapter
+    \begin{center}
+    \etchapterheadstyle{\@chapapp{\thechapter}} %  CHAPTER 1 or APPENDIX
+   \etchapterheadstyle{\MakeUppercase{#1}}                   %     TITLE OF CHAPTER
+    \end{center}
+    \setlength{\topmargin}{50 mm}   % back to 1in
+}}
+\renewcommand{\@makeschapterhead}[1]{{ 
+    \setlength{\topmargin}{50mm}   % really 1.5in, added by bph
+                               % to meet OAP standards
+    \normalfont\normalsize\bfseries   
+    \begin{center}
+     \etchapterheadstyle{#1} 
+        %     TITLE OF CHAPTER
+    \end{center}
+    \setlength{\topmargin}{50mm}   % back to 1in
+}}
+
+
+
+
+
+
+

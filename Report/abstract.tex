@@ -1,0 +1,31 @@
+\begin{center}
+\chapter*{\size\textbf{ABSTRACT}}
+\end{center}
+
+\addcontentsline{toc}{section}{ABSTRACT}
+
+\bigskip
+
+\bigskip
+
+\textbf{Title}: RE-DACT: An AI-Driven Platform for Automated Redaction of Sensitive Information in Documents
+
+\bigskip
+
+The proliferation of digital documents containing sensitive personally identifiable information (PII) has created an unprecedented challenge for organizations across healthcare, finance, legal, and government sectors. Manual redaction methods prove inadequate when processing the vast volumes of documents generated daily, leading to potential data breaches and regulatory non-compliance. This project presents RE-DACT, an intelligent web-based platform designed to automatically detect and mask sensitive Indian identity documents including Aadhaar UIDs, PAN cards, and payment card numbers from PDF and image files.
+
+The core innovation of RE-DACT lies in its multi-layered approach to PII detection. The system combines Optical Character Recognition (OCR) using Tesseract for text extraction with mathematical checksum validation algorithms to achieve near-zero false positive rates. Specifically, the Verhoeff algorithm validates Aadhaar 12-digit UIDs while the Luhn algorithm verifies payment card numbers. For PAN cards, structural pattern matching with entity-type validation ensures accurate detection without false positives from similar-looking alphanumeric strings.
+
+A significant technical contribution of this work is the multi-orientation OCR pipeline that tests eight preprocessing combinations comprising four rotation angles and two blur states. This approach addresses the common challenge of arbitrarily oriented documents in real-world scenarios. The pipeline employs an early-exit optimization strategy, terminating processing upon first successful detection, which enables sub-300ms processing for correctly oriented documents while maintaining robust handling of rotated inputs.
+
+The platform implements three configurable masking levels to accommodate diverse compliance requirements. The standard level masks all but the last four characters, partial masking preserves the first four digits, and full masking completely obscures the detected information. Additionally, the system incorporates a tamper-evident audit logging mechanism using SHA-256 hash chains in JSON-lines format, providing cryptographically verifiable compliance records suitable for regulatory audits and forensic analysis.
+
+Empirical evaluation on real Indian identity documents demonstrates consistent performance with processing times ranging from 274 to 1582 milliseconds depending on document complexity and orientation. The Aadhaar detection module achieved a 100\% true positive rate on documents with clear, readable text. The platform is built using FastAPI for the REST API layer, with a vanilla HTML/CSS/JavaScript frontend served as static files, ensuring zero-data-retention architecture where processed documents exist only in transient memory during processing.
+
+This report provides comprehensive documentation of the system architecture, detection algorithms, implementation details, and performance evaluation. Future work includes integration of Named Entity Recognition (NER) using transformer-based models like BERT for detecting unstructured PII such as names, addresses, and phone numbers, extending the pipeline to support video redaction, adding multi-language OCR support for Indian scripts, and containerizing the application for enterprise deployment.
+
+\bigskip
+
+\textbf{Keywords}: Redaction, PII, OCR, Verhoeff Algorithm, Luhn Algorithm, Tesseract, Privacy, Compliance, Audit Logging, FastAPI
+
+\end{abstractpage}
