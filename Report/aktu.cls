@@ -569,3 +569,18 @@ University, Lucknow) }}\\
 
 \def\endabstract{\par}
 
+% Missing commands from titlesec
+\def\setsecheadstyle#1{\def\@secheadstyle{#1}}
+\def\@secheadstyle{\Large\bfseries}
+
+% subtitle command
+\def\subtitle#1{\gdef\@subtitle{#1}}
+\def\@subtitle{}
+
+% signature helper command
+\def\signature#1#2{#1\\ #2}
+
+% department command
+\def\department#1{\gdef\@department{#1}}
+\gdef\@department{Department of Computer Science and Engineering}
+

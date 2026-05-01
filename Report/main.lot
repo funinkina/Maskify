@@ -1,13 +1,13 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Summary of Literature Gaps and RE-DACT's Contributions}}{17}{}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces Literature Gaps and RE-DACT's Response}}{10}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Software Requirements Summary}}{39}{}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Detection Results Summary}}{44}{}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Test Case Execution Summary}}{48}{}%
-\contentsline {table}{\numberline {4.4}{\ignorespaces Performance Comparison with Existing Solutions}}{51}{}%
-\contentsline {table}{\numberline {4.5}{\ignorespaces Feature Comparison with Existing Redaction Solutions}}{52}{}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Software Requirements Summary}}{22}{}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Detection Results Summary}}{24}{}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Processing Time Results}}{25}{}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Test Case Execution Summary}}{27}{}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Qualitative Comparison with Related Redaction Approaches}}{28}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
