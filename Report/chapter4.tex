@@ -320,6 +320,8 @@ This result structure enables the interface to display comprehensive processing 
 
 OCR dominates processing time. The checksum and regex detectors run quickly compared with Tesseract. The early-exit design is therefore important: a normal upright image can complete after the first OCR pass, while a difficult image may require several attempts.
 
+For image files, processing time depends on resolution and OCR quality. For PDFs, time increases with page count because each page is converted and processed separately. The current implementation processes PDF pages sequentially.
+
 \bigskip
 
 \section{Summary}

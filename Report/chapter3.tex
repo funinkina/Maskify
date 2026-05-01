@@ -200,9 +200,11 @@ The REST API exposes three endpoints.
 
 The browser interface uses these endpoints directly. It shows total detections, pages processed, processing time, selected redaction level, file type, a detection-type breakdown, a detections table, a preview, and a download link when a redacted file is available.
 
-The interface also displays detection results in a structured table format. Each row shows the entity type, the masked value, and the page number where it was found. This structured presentation helps users quickly verify what was detected and where in the document it appears.
+The interface also displays detection results in a structured table format. Each row shows the entity type, the masked value, and the page number where it was found. This structured presentation helps users quickly verify what was detected and where in the document it appears. When a redacted file is available, the interface provides a preview showing the applied redactions and a download button for saving the output.
 
 \bigskip
+
+The system design follows principles of modularity, inspectability, and practical deployment. Each component has a single, well-defined responsibility that enables independent testing and modification.
 
 The system design follows principles of modularity, inspectability, and practical deployment. Each component has a single, well-defined responsibility that enables independent testing and modification. The boundaries between components are defined by data formats rather than tight coupling, which allows individual components to be updated without affecting others.
 
