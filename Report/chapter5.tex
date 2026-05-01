@@ -108,11 +108,17 @@ The computational requirements for OCR and validation are modest compared to man
 
 \bigskip
 
+The report has documented the complete development journey from problem identification through design, implementation, and evaluation. The system achieves its core objectives while making remaining limitations explicit for future development.
+
+\bigskip
+
 These considerations outline both the immediate technical roadmap and the broader ecosystem development that could support long-term success of the redaction system. The foundation established by the current implementation provides a solid basis for addressing these opportunities.
 
 \bigskip
 
 The core achievements of this project demonstrate the feasibility of building practical document redaction systems for Indian identity documents. The system successfully combines OCR with deterministic validation to achieve reliable detection of structured identifiers. The multi-orientation handling addresses a common real-world problem that would cause simpler systems to fail. The zero-data-retention design provides privacy guarantees that cloud-based alternatives cannot match.
+
+\bigskip
 
 The validation algorithms represent the strongest technical contribution. The Verhoeff implementation for Aadhaar and the Luhn implementation for payment cards provide mathematical certainty about candidate validity that regex-based systems cannot achieve. The PAN holder-type validation adds semantic filtering beyond simple structural matching. These algorithms are efficient enough to run on every candidate without significant performance impact.
 

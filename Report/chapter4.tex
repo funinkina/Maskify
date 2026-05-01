@@ -117,24 +117,16 @@ Processing time reflected the early-exit design. Correctly oriented Aadhaar imag
 \caption{Processing Time Results}
 \label{tab:timing_results}
 \centering
-\resizebox{\textwidth}{!}{
-\begin{tabular}{|l|c|c|c|p{5cm}|}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{|l|c|c|c|p{4cm}|}
 \hline
 \textbf{Document} & \textbf{Type} & \textbf{Time (ms)} & \textbf{Detections} & \textbf{Notes} \\
 \hline
-Aadhaar-1 & PNG & 296 & 1 & Early exit after first useful OCR attempt \\
+Aadhaar-1 & PNG & 296 & 1 & Early exit after first OCR attempt \\
 \hline
-Aadhaar-2 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
+Aadhaar-2 & PNG & 274 & 1 & Early exit after first OCR attempt \\
 \hline
-Aadhaar-3 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
-\hline
-\textbf{Document} & \textbf{Type} & \textbf{Time (ms)} & \textbf{Detections} & \textbf{Notes} \\
-\hline
-Aadhaar-1 & PNG & 296 & 1 & Early exit after first useful OCR attempt \\
-\hline
-Aadhaar-2 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
-\hline
-Aadhaar-3 & PNG & 274 & 1 & Early exit after first useful OCR attempt \\
+Aadhaar-3 & PNG & 274 & 1 & Early exit after first OCR attempt \\
 \hline
 PAN-Card-1 & JPG & 1582 & 0 & OCR attempts completed without detection \\
 \hline
@@ -145,6 +137,10 @@ Credit-Card-1 & PNG & 699 & 0 & Multiple OCR attempts required \\
 \end{tabular}
 }
 \end{table}
+
+\bigskip
+
+Masking output matched the implementation.
 
 Masking output matched the implementation. For a 12-character identifier such as \texttt{123456789012}, standard masking produces \texttt{XXXXXXXX9012}, partial masking produces \texttt{XXXX56789012}, and full masking produces \texttt{XXXXXXXXXXXX}. The same masking ranges are used for drawing black rectangles on the image.
 
@@ -320,7 +316,11 @@ This result structure enables the interface to display comprehensive processing 
 
 OCR dominates processing time. The checksum and regex detectors run quickly compared with Tesseract. The early-exit design is therefore important: a normal upright image can complete after the first OCR pass, while a difficult image may require several attempts.
 
-For image files, processing time depends on resolution and OCR quality. For PDFs, time increases with page count because each page is converted and processed separately. The current implementation processes PDF pages sequentially.
+For image files, processing time depends on resolution and OCR quality. For PDFs, time increases with page count because each page is converted and processed separately. The current implementation processes PDF pages sequentially. Parallel page processing is a possible future optimization.
+
+\bigskip
+
+NER adds substantial overhead when enabled. The model is preloaded at startup if dependencies are available, which reduces first-request delay, but inference still takes longer than rule-based detection.
 
 \bigskip
 

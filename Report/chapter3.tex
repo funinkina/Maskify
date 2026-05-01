@@ -224,7 +224,9 @@ For PDF inputs, the system converts each page to a 300 DPI image using the pdf2i
 
 The OCR text extraction uses Tesseract with specific configuration parameters optimized for sparse text containing scattered numeric identifiers. The page segmentation mode 11 treats the image as a collection of text pieces in no particular order, which works well for identity documents where the target numbers may appear in various positions on the page. The LSTM-based OCR engine mode 3 provides the most comprehensive recognition capability.
 
-Following text extraction, the detection module processes the extracted text through multiple detector functions in sequence. The structured identifier detectors use mathematical validation to confirm candidate validity. The regex-based detectors use pattern matching. The optional NER detector uses transformer-based inference when available.
+Following text extraction, the detection module processes the extracted text through multiple detector functions in sequence. The structured identifier detectors use mathematical validation to confirm candidate validity. The regex-based detectors use pattern matching. The optional NER detector uses transformer-based inference when available. Each detector contributes detections to a unified list that is then processed through overlap deduplication.
+
+\bigskip
 
 The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output. For image inputs, the single redacted image is the final output. For PDF inputs, the redacted page images are converted back to a multi-page PDF using img2pdf, preserving the original document structure while incorporating the applied redactions.
 

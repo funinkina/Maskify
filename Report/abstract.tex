@@ -34,4 +34,8 @@ The motivation for this work stems from the practical challenge of handling sens
 
 The system combines multiple detection approaches: mathematical validation for structured identifiers, pattern matching for general formats, and optional machine learning for unstructured entities. The multi-orientation OCR handling ensures that rotated and angled documents can be processed without manual pre-processing. The character-level masking provides flexibility in redaction depth appropriate for different compliance scenarios.
 
-Testing on a small set of Indian identity-document samples showed reliable Aadhaar detection when the text was clear and readable. PAN, payment card, and NER detections depended more heavily on OCR quality, especially on images with complex backgrounds or stylized text. The report documents the system design, validation algorithms, implementation details, test results, limitations, and future improvements.
+Testing on a small set of Indian identity-document samples showed reliable Aadhaar detection when the text was clear and readable. PAN, payment card, and NER detections depended more heavily on OCR quality, especially on images with complex backgrounds or stylized text. The report documents the system design, validation algorithms, implementation details, test results, limitations, and future improvements such as stronger NER, better multilingual OCR, batch processing, and containerized deployment.
+
+\bigskip
+
+The platform provides three masking levels.
