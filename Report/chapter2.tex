@@ -1,2 +1,108 @@
-\chapter{\uppercase\textbf{Literature Review(Non-Web Based Projects/Software Requirement Specification(Web based Projects}}
+\chapter{Literature Review (Non-Web Based Projects/Software Requirement Specification(Web based Projects)}
 
+\section{Background and Terminology}
+
+The domain of document redaction and personally identifiable information (PII) protection has evolved significantly over the past decades, driven by increasing digital document volumes and tightening privacy regulations. Understanding the fundamental concepts and terminology provides essential foundation for appreciating the technical approaches examined in this chapter.
+
+Personally Identifiable Information refers to any data that can be used to identify, contact, or locate a single person, or to identify an individual in context. The concept extends beyond simple identifiers like names or identification numbers to include information that can be combined to reveal an individual's identity. The Information Technology Act of India, through its various amendments and rules, defines sensitive personal data to include biometric information, purpose of processing, and data that requires higher protection levels. The Digital Personal Data Protection Act of 2023 establishes a comprehensive framework for processing digital personal data, imposing specific obligations on data fiduciaries regarding collection, storage, and protection of personal information.
+
+The context of Indian identity documents presents unique characteristics that differentiate it from Western identification systems. The Aadhaar system, established in 2009, provides a 12-digit unique identification number linked to demographic and biometric information of residents. The Aadhaar number follows specific structural patterns and incorporates a Verhoeff checksum digit for validation, making algorithmic verification possible beyond simple pattern matching. The Permanent Account Number (PAN) is a ten-character alphanumeric identifier issued by the Income Tax Department for financial transaction tracking. PAN card numbers follow a specific format where the first five characters are uppercase letters, the next four are digits, and the final character is a letter representing the entity type. Payment cards issued by banks and financial institutions follow international standards with 13-19 digit numbers validated through the Luhn algorithm.
+
+Redaction, in the context of document processing, refers to the process of removing, obscuring, or masking sensitive information from documents before sharing or publishing. Traditional manual redaction involves physically marking or cutting portions of physical documents, while digital redaction uses software tools to overlay black boxes or remove text from electronic files. The effectiveness of redaction is measured by two key metrics: precision (correctly identifying and masking actual sensitive information) and recall (not missing any sensitive information that should be masked). A failed redaction, where sensitive information remains visible despite attempted masking, can lead to serious consequences including identity theft, financial fraud, and regulatory penalties.
+
+\section{Traditional Redaction Approaches}
+
+Manual redaction represents the most traditional approach to document sanitization, involving human reviewers examining each document to identify and mask sensitive information. This approach, while straightforward in concept, presents substantial practical challenges. The average human attention span and processing speed limit the volume of documents that can be reviewed manually. Typical processing rates range from 5-15 pages per hour depending on document complexity, making large-scale processing operations prohibitively time-consuming and expensive. The error rate in manual redaction presents another significant concern. Cognitive psychology research demonstrates that repetitive tasks lead to attention lapses, and simple errors like missing a single digit in a long number can render the entire redaction ineffective.
+
+Rule-based pattern matching using regular expressions provides the first layer of automated redaction capability. This approach uses predefined patterns to identify potential sensitive information in text. For example, a regular expression matching exactly twelve consecutive digits identifies candidate Aadhaar numbers, while patterns matching the format `AAAAA9999A` identify candidate PAN numbers. Regular expression systems offer the advantages of transparency (the matching logic is explicit and auditable), speed (modern regex engines process text efficiently), and simplicity (patterns can be written and maintained without machine learning expertise).
+
+However, pure regex-based approaches suffer from fundamental limitations. They cannot distinguish between valid and invalid identification numbers that happen to match the structural pattern. A twelve-digit sequence like `123456789012` matches the pattern for Aadhaar but is not a valid number because it fails checksum validation. The result is false positives that lead to over-redaction, obscuring legitimate non-sensitive numbers. Conversely, variations in formatting break pattern matching entirely. Aadhaar numbers may be written with spaces as `1234 5678 9012` or with dashes as `1234-5678-9012`, and simple patterns fail to capture these variations. Furthermore, regex patterns cannot understand context. A twelve-digit number appearing in a page number, a document ID, or a table of statistics would trigger false redaction, and determining whether the number represents an actual Aadhaar requires understanding the document semantics.
+
+Traditional OCR systems like early versions of Tesseract relied purely on pattern recognition without validation, producing text output that required downstream processing to identify sensitive information. The accuracy of OCR itself varies dramatically based on image quality, font characteristics, and scanning conditions. Degraded documents with noise, skew, or poor contrast produce OCR outputs with character recognition errors that make downstream pattern matching unreliable. The assumption in many traditional systems that scanned documents arrive in standard orientation fails in practice where documents may be rotated, skewed, or photographed at angles.
+
+\section{AI-Based Approaches for PII Detection}
+
+The emergence of machine learning and deep learning approaches has transformed the landscape of document analysis and PII detection. These technologies offer the potential for context-aware detection, adaptability to new document types, and handling of unstructured information that rule-based systems struggle with.
+
+Optical Character Recognition using modern engines achieves significantly higher accuracy than earlier systems through the application of neural networks. Tesseract version 5, the current stable release used in this project, implements Long Short-Term Memory (LSTM) neural networks for character recognition. The LSTM architecture excels at sequential data processing, making it well-suited for reading text where the identity of each character depends on both the character's visual features and the surrounding context. The Tesseract engine offers multiple OCR Engine Modes (OEM) with mode 3 (default and most comprehensive) utilizing a combination of LSTM neural networks and legacy recognition engines. Page Segmentation Modes (PSM) allow configuration for different document layouts, with PSM 11 (sparse text) optimized for documents containing scattered numeric identifiers like identity documents.
+
+Named Entity Recognition (NER) represents a significant advancement beyond rule-based pattern matching by enabling context-aware identification of information types. Modern NER systems use transformer architectures like BERT (Bidirectional Encoder Representations from Transformers) to understand word context from large amounts of training data. The dslim/bert-base-NER model, used in this project for detecting names and addresses, identifies PERSON and LOCATION entities with confidence scores that can be thresholded for accuracy control. NER systems distinguish between similar-looking entities that rules cannot differentiate. For instance, the word "John" might be a person's name (requiring redaction) or part of a company name "John's Bakery" (which may or may not require redaction depending on context), and NER models trained on diverse text can make this distinction.
+
+Deep learning object detection extends redaction capabilities beyond text to visual elements in images. Systems like YOLO (You Only Look Once) can identify faces, license plates, and other visual PII in photographs and video frames. This capability is essential for complete redaction of documents containing both printed text and visual identifiers. However, these systems require substantial computational resources and training data, making them complex to deploy in resource-constrained environments.
+
+Large Language Models (LLMs) represent the cutting edge of natural language processing, offering sophisticated contextual understanding that can theoretically handle complex redaction scenarios. Research has explored using LLMs for PII detection and redaction, with findings indicating that fine-tuned models can achieve high accuracy on structured PII types. However, LLMs present challenges including computational cost (both inference time and hardware requirements), data privacy concerns (sending documents to external API services), and consistency issues (the same prompt may produce different outputs). The benchmark study by Garza et al. on the PRvL dataset demonstrates that while LLMs offer powerful generalization capabilities, their performance varies significantly across architectures and adaptation methods, revealing complex trade-offs between accuracy, latency, and PII leakage risks.
+
+The combination of multiple detection approaches offers the most robust solution. Rule-based checksum validation provides mathematical certainty for structured identifiers like Aadhaar and payment card numbers. Pattern matching handles formats like PAN numbers that lack checksums. NER adds capability for unstructured PII like names and addresses. This layered approach, implemented in RE-DACT, achieves detection accuracy that exceeds any single method alone.
+
+\section{Related Work in Document Redaction}
+
+The research community has produced significant work addressing various aspects of automated redaction, establishing theoretical foundations and demonstrating practical implementations.
+
+S{\'a}nchez and Batet introduced the "C-sanitized" model, a framework grounded in information theory that provides a priori privacy guarantees for document redaction. Their approach moves beyond simple pattern matching to consider semantic inferences that could lead to data disclosure, quantifying disclosure risk using metrics like Information Content (IC) and Point-wise Mutual Information (PMI). While pioneering, this model remained primarily theoretical, highlighting the complexity of achieving truly semantic-aware redaction in practice.
+
+Lee and Woods explored automated redaction in the context of digital heritage and archives, examining digital forensics tools for redacting private data from complex digital artifacts like disk images. Their work on the BitCurator project demonstrated the necessity of specialized workflows for handling born-digital collections, using tools like bulk extractor to identify sensitive data patterns. This research emphasized that effective redaction requires different strategies for different data contexts, from simple documents to entire file systems.
+
+Orekondy et al. addressed the redaction of private information in images by proposing a "redaction by segmentation" paradigm. This approach identifies and obfuscates specific pixel regions corresponding to privacy attributes including faces, fingerprints, and license plates. Their work emphasized the critical trade-off between privacy and utility, showing that targeted region redaction can preserve image intelligibility while protecting sensitive information. This highlighted the need for integrated computer vision capabilities in comprehensive redaction platforms.
+
+In the specific context of document processing, Thetbanthad et al. demonstrated a two-stage pipeline using OCR and an LLM to redact PII from drug labels in compliance with Thailand's Personal Data Protection Act (PDPA). Their work illustrated how AI can be tailored to specific regulatory and linguistic contexts, combining Tesseract OCR for text extraction and LLMs for classification. This approach directly influenced the architecture of RE-DACT, which similarly combines OCR with structured detection rather than relying solely on either method.
+
+The controlled experiment by Peng et al. comparing manual redaction with AI-assisted tools found that AI technologies like iDox.ai Redact significantly outperform manual methods in both accuracy and speed. This provided empirical evidence for the revolutionary impact of AI in data protection workflows, though their study focused primarily on commercial tools rather than open-source implementations.
+
+Existing commercial tools provide instructive comparisons for system design. Adobe Acrobat Pro offers redaction capabilities but lacks specialized Indian PII detection and checksum validation. Microsoft Presidio provides open-source PII detection with pattern-based and NER-based detection, but requires customization for Indian document types. iDox.ai offers commercial redaction with some API-based access but lacks transparency about detection methods and does not specifically target Indian identity formats. No existing solution combines the three key features of this project: mathematical checksum validation, multi-orientation robustness, and cryptographic audit logging.
+
+\section{Algorithms for PII Validation}
+
+The mathematical foundations underlying PII validation in this project deserve detailed examination, as these algorithms provide the deterministic accuracy that distinguishes the system from pattern-matching-only approaches.
+
+The Verhoeff algorithm, developed by Jacobus Verhoeff in 1969, provides error detection for identification numbers through a sophisticated mathematical construction. Unlike simpler checksum algorithms like Mod 10, the Verhoeff algorithm catches all single-digit errors and all adjacent transpositions, making it significantly more robust for validation purposes. The algorithm operates using two tables: a multiplication table (a 10×10 Cayley table of the dihedral group D5) and a permutation table (an 8×10 matrix). For a 12-digit number, the algorithm processes digits from right to left, using the position index to select the appropriate permutation value for each digit, then combining through the group operation. The final checksum of zero indicates a valid number. The probability that a random 12-digit number passes the Verhoeff check is approximately 1 in 10, providing strong false positive rejection.
+
+The Luhn algorithm, invented by Hans Peter Luhn in 1954 and patented in 1960, serves as the international standard for validating credit card numbers and other identification numbers. The algorithm applies a modulus-10 check where every second digit from the right is doubled, and if the result exceeds 9, the digits are summed (equivalent to subtracting 9). The sum of all digits must be divisible by 10 for the number to be valid. While simpler than Verhoeff, the Luhn algorithm effectively catches single-digit errors and transposition errors involving adjacent digits, making it suitable for payment card validation where the volume of potential numbers is extremely high.
+
+PAN card validation differs fundamentally from Aadhaar and payment card validation because PAN numbers do not incorporate a checksum. Instead, validation relies entirely on structural pattern matching. The PAN format `[A-Z]{5}[0-9]{4}[A-Z]` ensures a specific structure, but the fourth character carries additional meaning as an entity type indicator. Valid entity type characters include A (Association of Persons), B (Body of Individuals), C (Company), F (Firm), G (Government), H (Hindu Undivided Family), J (Artificial Juridical Person), L (Local Authority), P (Individual), and T (Trust). This entity type validation adds a layer of semantic checking beyond simple pattern matching, reducing false positives from random alphanumeric sequences.
+
+These validation algorithms provide mathematical certainty that cannot be achieved through pattern matching alone. When combined with OCR text extraction, they create a detection pipeline with near-zero false positive rates on well-structured PII, addressing the primary weakness of rule-based systems.
+
+\section{Research Gap Analysis}
+
+The literature review reveals specific gaps in existing approaches that this project addresses through its integrated design and implementation.
+
+The first identified gap involves the combination of OCR with mathematical validation. Most existing systems use either OCR with pattern matching (susceptible to false positives) or structured validation without context (unable to handle OCR errors and format variations). RE-DACT bridges this gap by extracting text through OCR, identifying candidate sequences through pattern matching, then validating candidates through mathematical algorithms before reporting detections. This two-stage approach achieves detection accuracy that exceeds either method alone.
+
+The second gap concerns multi-orientation document handling. Existing solutions typically assume correct document orientation or require manual pre-processing to correct rotation. The multi-orientation OCR pipeline in RE-DACT systematically tests eight preprocessing combinations, ensuring detection regardless of document positioning while the early-exit optimization maintains reasonable processing times for correctly oriented documents.
+
+The third gap relates to audit trail capabilities. While commercial products may offer logging, the specific requirement for tamper-evident records using cryptographic hash chains is largely unaddressed in existing open-source solutions. The SHA-256 hash chain implementation in RE-DACT provides verifiable evidence suitable for compliance audits, something not available in comparable tools.
+
+The fourth gap involves support for Indian identity documents specifically. Most existing tools target Western document formats (SSN, credit cards, etc.) and require significant customization for Indian PII types. RE-DACT implements explicit detection logic for Aadhaar, PAN, and Indian payment cards, providing immediate utility for organizations processing Indian documents.
+
+The fifth gap concerns accessibility. Commercial redaction tools require expensive licensing, while academic tools often lack the polish for production use. RE-DACT provides a complete, usable solution as open-source software, enabling adoption by organizations with limited budgets while allowing modification and extension as needed.
+
+These gaps, summarized in Table \ref{tab:lit_gaps}, define the specific contribution of this project to the field of automated document redaction.
+
+\begin{table*}[htbp]
+\caption{Summary of Literature Gaps and RE-DACT's Contributions}
+\label{tab:lit_gaps}
+\centering
+\begin{tabular}{|p{3.5cm}|p{4.5cm}|p{4.5cm}|}
+\hline
+\textbf{Gap Area} & \textbf{Existing Limitation} & \textbf{RE-DACT Solution} \\
+\hline
+OCR + Validation & Pattern matching without mathematical validation leads to false positives & Two-stage approach: OCR extracts text, then Verhoeff/Luhn validate candidates \\
+\hline
+Orientation Handling & Assumes correct document orientation, fails on rotated inputs & Multi-orientation pipeline tests 8 preprocessing combinations with early-exit \\
+\hline
+Audit Trail & Limited logging capability, no tamper evidence & SHA-256 hash chain provides cryptographically verifiable records \\
+\hline
+Indian PII Support & Tools target Western formats (SSN, credit cards) & Explicit detection for Aadhaar, PAN, Indian payment cards \\
+\hline
+Accessibility & Expensive commercial tools or academic prototypes lacking polish & Complete, usable open-source solution with web interface \\
+\hline
+\end{tabular}
+\end{table*}
+
+\section{Summary}
+
+This chapter has examined the landscape of document redaction and PII detection through analysis of traditional approaches, AI-based methods, and existing systems. The fundamental limitations of manual redaction (unscalable, error-prone) and simple pattern matching (false positives, context-blind) establish the need for more sophisticated approaches. The emergence of neural network-based OCR, transformer-based NER, and mathematical validation algorithms creates opportunities for systems that achieve high accuracy while remaining accessible.
+
+The research gap analysis identifies five specific areas where existing solutions fall short, all of which RE-DACT addresses through its integrated design. The combination of OCR with checksum validation, multi-orientation robustness, cryptographic audit logging, specialized Indian PII support, and open-source accessibility represents a meaningful contribution to the field.
+
+The next chapter examines the system architecture and algorithmic approaches in detail, providing the technical foundation for understanding the implementation described in subsequent chapters.
