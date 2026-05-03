@@ -49,6 +49,31 @@ transformers, torch & Optional & Needed only for NER support \\
 \end{tabular}
 \end{table}
 
+\begin{table}[htbp]
+\caption{System Configuration Parameters}
+\label{tab:config_params}
+\centering
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Rationale} \\
+\hline
+PDF Render DPI & 300 & Balances OCR accuracy with conversion speed \\
+\hline
+Blur Kernel & $5 \times 5$ & Reduces noise without losing character features \\
+\hline
+Blur Sigma & 0 (auto) & OpenCV computes optimal sigma from kernel size \\
+\hline
+OCR Engine Mode & OEM 3 & LSTM neural network for best accuracy \\
+\hline
+Page Segmentation & PSM 11 & Sparse text mode for scattered numeric identifiers \\
+\hline
+OCR Language & eng & English character set \\
+\hline
+Result TTL & 600s & In-memory store auto-cleanup interval \\
+\hline
+\end{tabular}
+\end{table}
+
 For normal image processing, a consumer laptop with 8 GB RAM is sufficient. Optional NER support needs more memory because the BERT model and PyTorch runtime must be loaded. Processing time depends mainly on OCR, page count, image quality, and whether the first orientation produces a detection.
 
 \subsection{Assumptions and Dependencies}

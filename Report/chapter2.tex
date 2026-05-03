@@ -36,6 +36,27 @@ Computer vision approaches can address visual redaction beyond text. Object dete
 
 The trend in modern redaction systems is toward combining multiple techniques: OCR for text extraction, pattern matching for candidate identification, mathematical validation for structured types, NER for unstructured types, and visual detection for non-text elements. The specific combination depends on the target document types, identifier formats, and performance requirements.
 
+\begin{table}[htbp]
+\caption{Research Gaps Addressed by RE-DACT}
+\label{tab:research_gaps}
+\centering
+\begin{tabular}{|p{2.5cm}|p{3.5cm}|p{4cm}|}
+\hline
+\textbf{Research Area} & \textbf{Identified Gap} & \textbf{RE-DACT Solution} \\
+\hline
+System Integration & Lack of unified platform & Integrated platform with single workflow \\
+\hline
+Scalability & Can't handle enterprise volumes & Sub-300ms processing with in-memory results \\
+\hline
+Contextual Understanding & Rule-based fails on ambiguous data & Checksum validation (Verhoeff, Luhn) \\
+\hline
+Adaptability & One-size-fits-all approach & Three masking levels (standard, partial, full) \\
+\hline
+Security and Trust & No auditability & SHA-256 hash-chain audit logging \\
+\hline
+\end{tabular}
+\end{table}
+
 \bigskip
 
 \section{Related Work in Document Redaction}

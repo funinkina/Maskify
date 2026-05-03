@@ -1,11 +1,12 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {3.1}{\ignorespaces RE-DACT Upload Interface}}{29}{figure.3.1}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces RE-DACT Results Interface}}{30}{figure.3.2}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces System Architecture: RE-DACT Pipeline from File Ingestion to Output Delivery}}{29}{}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces RE-DACT Upload Interface}}{30}{}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces RE-DACT Results Interface}}{31}{}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Before Redaction: Sample Document with Visible PII}}{51}{figure.4.1}%
-\contentsline {figure}{\numberline {4.2}{\ignorespaces After Redaction: PII Masked with Standard Level}}{52}{figure.4.2}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Before Redaction: Sample Document with Visible PII}}{54}{}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces After Redaction: PII Masked with Standard Level}}{55}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

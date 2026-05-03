@@ -38,6 +38,31 @@ Performance can be improved through parallel page processing, OCR configuration 
 
 The practical value of the system lies in its combination of features that address specific gaps in the available tooling. The built-in validation for Indian identifier types eliminates the need for custom rule development that existing tools would require. The multi-orientation handling addresses a common failure mode that would otherwise require manual pre-processing. The audit logging provides compliance evidence that most open-source tools lack. The zero-data-retention design addresses data privacy concerns that cloud-based alternatives raise.
 
+\begin{table}[htbp]
+\caption{Feature Comparison with Existing Redaction Solutions}
+\label{tab:comparison}
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Feature} & \textbf{RE-DACT} & \textbf{Adobe Acrobat} & \textbf{iDox.ai} & \textbf{MS Presidio} & \textbf{Manual} \\
+\hline
+Algorithmic Checksum Validation & Yes & -- & -- & -- & -- \\
+\hline
+Multi-Orientation OCR (8 combos) & Yes & -- & -- & -- & -- \\
+\hline
+Tamper-Evident Audit Log & Yes & -- & Yes & -- & -- \\
+\hline
+Indian PII (Aadhaar/PAN) & Yes & -- & -- & Partial & Yes \\
+\hline
+Open Source & Yes & -- & -- & Yes & N/A \\
+\hline
+Sub-second Processing & Yes & Yes & Yes & Yes & -- \\
+\hline
+Web-Based Interface & Yes & -- & Yes & -- & N/A \\
+\hline
+\end{tabular}
+\end{table}
+
 The project also demonstrates that effective document processing systems can be built from established open-source components without requiring proprietary software or specialized infrastructure. This accessibility enables adoption by organizations that cannot afford commercial licensing or that have policies against sending sensitive documents to external services.
 
 \bigskip

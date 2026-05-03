@@ -17,6 +17,13 @@ The pipeline has six practical stages:
     \item Output assembly and audit logging.
 \end{enumerate}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{flow.png}
+\caption{System Architecture: RE-DACT Pipeline from File Ingestion to Output Delivery}
+\label{fig:architecture_flowchart}
+\end{figure}
+
 The implementation favors simple, inspectable components. Aadhaar and payment card validation are pure Python functions. Image rotation and masking use OpenCV. PDF conversion uses \texttt{pdf2image}, and PDF assembly uses \texttt{img2pdf}. The browser interface uses plain HTML, CSS, and JavaScript rather than a frontend framework.
 
 The application uses temporary directories for uploaded and processed files. When redaction succeeds, the result is stored in an in-memory dictionary and remains downloadable for ten minutes. The cleanup routine removes expired working directories during later upload requests. This is a short-retention design. It avoids permanent document storage, but it does not mean the document exists only in memory.
@@ -111,6 +118,23 @@ PAN numbers use a fixed ten-character structure. The first five characters are u
 \end{algorithmic}
 
 This validation reduces false positives but does not prove that the PAN was issued by the Income Tax Department. It is a format and holder-type check, not an online verification step.
+
+\begin{table}[htbp]
+\caption{Detection Algorithm Summary}
+\label{tab:detection_algorithms}
+\centering
+\begin{tabular}{|c|l|c|c|}
+\hline
+\textbf{PII Type} & \textbf{Algorithm} & \textbf{Complexity} & \textbf{Digits} \\
+\hline
+Aadhaar UID    & Verhoeff checksum  & $O(12)$   & 12 \\
+\hline
+Payment Card   & Luhn (mod-10)      & $O(n)$    & 13-19 \\
+\hline
+PAN Card       & Structural regex   & $O(10)$   & 10 \\
+\hline
+\end{tabular}
+\end{table}
 
 \bigskip
 
@@ -212,6 +236,23 @@ The REST API exposes three endpoints.
 
 \texttt{GET /api/result/\{request\_id\}} returns the processed file if the result still exists and has not expired. If the result is missing or older than the ten-minute TTL, the endpoint returns HTTP 404.
 
+\begin{table}[htbp]
+\caption{API Endpoints}
+\label{tab:api_endpoints}
+\centering
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Purpose} \\
+\hline
+\texttt{/api/health} & GET & Health check (returns version) \\
+\hline
+\texttt{/api/process-file} & POST & Upload file, returns detection stats and download URL \\
+\hline
+\texttt{/api/result/\{id\}} & GET & Download redacted file by request ID \\
+\hline
+\end{tabular}
+\end{table}
+
 The browser interface uses these endpoints directly. It shows total detections, pages processed, processing time, selected redaction level, file type, a detection-type breakdown, a detections table, a preview, and a download link when a redacted file is available.
 
 The interface also displays detection results in a structured table format. Each row shows the entity type, the masked value, and the page number where it was found. This structured presentation helps users quickly verify what was detected and where in the document it appears. When a redacted file is available, the interface provides a preview showing the applied redactions and a download button for saving the output.
@@ -243,6 +284,23 @@ Following text extraction, the detection module processes the extracted text thr
 \bigskip
 
 The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output.
+
+\begin{table}[htbp]
+\caption{Redaction Masking Levels}
+\label{tab:masking_levels}
+\centering
+\begin{tabular}{|c|l|p{4cm}|}
+\hline
+\textbf{Level} & \textbf{Strategy} & \textbf{Aadhaar Example} \\
+\hline
+Standard & Mask all but last 4 & \texttt{XXXXXXXX1234} \\
+\hline
+Partial  & Mask first 4 only   & \texttt{XXXX56781234} \\
+\hline
+Full     & Mask all characters & \texttt{XXXXXXXXXXXX} \\
+\hline
+\end{tabular}
+\end{table}
 
 \bigskip
 

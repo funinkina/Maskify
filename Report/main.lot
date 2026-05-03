@@ -1,14 +1,20 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Literature Gaps and RE-DACT's Response}}{22}{table.2.1}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces Research Gaps Addressed by RE-DACT}}{17}{}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Literature Gaps and RE-DACT's Response}}{23}{}%
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Detection Algorithm Summary}}{35}{}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces API Endpoints}}{40}{}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Redaction Masking Levels}}{43}{}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Software Requirements Summary}}{47}{table.4.1}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Detection Results Summary}}{50}{table.4.2}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Processing Time Results}}{53}{table.4.3}%
-\contentsline {table}{\numberline {4.4}{\ignorespaces Test Case Execution Summary}}{56}{table.4.4}%
-\contentsline {table}{\numberline {4.5}{\ignorespaces Qualitative Comparison with Related Redaction Approaches}}{57}{table.4.5}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Software Requirements Summary}}{50}{}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces System Configuration Parameters}}{51}{}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Detection Results Summary}}{54}{}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Processing Time Results}}{55}{}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Test Case Execution Summary}}{58}{}%
+\contentsline {table}{\numberline {4.6}{\ignorespaces Qualitative Comparison with Related Redaction Approaches}}{59}{}%
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Feature Comparison with Existing Redaction Solutions}}{69}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \contentsfinish 

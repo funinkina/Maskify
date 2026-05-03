@@ -11,3 +11,4 @@ audit.log
 *.aux
 *.log
 *.toc
+REDACT_impl
