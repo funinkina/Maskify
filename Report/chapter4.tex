@@ -111,29 +111,29 @@ Aadhaar detection performed best on clear images. The Verhoeff checksum rejected
 Email and phone detection worked well on simple text because both rely on direct regex patterns. NER detections were more variable. Names were easier to detect than full addresses, which is expected because the selected BERT NER model is trained on general English NER categories, not postal-address extraction from OCR output.
 
 \begin{table}[htbp]
+\small
 \caption{Detection Results Summary}
 \label{tab:detection_results}
 \centering
-\resizebox{\textwidth}{!}{
-\begin{tabular}{|l|c|c|c|p{4.5cm}|}
+\begin{tabular}{|l|c|c|c|p{2.2cm}|}
 \hline
-\textbf{PII Type} & \textbf{Test Docs} & \textbf{Detected} & \textbf{Recorded Accuracy} & \textbf{Notes} \\
+\textbf{Type} & \textbf{T} & \textbf{D} & \textbf{\%} & \textbf{Notes} \\
 \hline
-Aadhaar & 5 & 5 & 100\% & Clear readable text; Verhoeff validation used \\
+Aadhaar & 5 & 5 & 100 & Verhoeff \\
 \hline
-PAN Card & 4 & 2 & 50\% & OCR struggled with complex card backgrounds \\
+PAN Card & 4 & 2 & 50 & OCR issue \\
 \hline
-Payment Card & 3 & 2 & 67\% & Depends on clean OCR and Luhn validation \\
+Payment Card & 3 & 2 & 67 & Luhn \\
 \hline
-Email & 3 & 3 & 100\% & Regex-based detection \\
+Email & 3 & 3 & 100 & Regex \\
 \hline
-Phone & 3 & 3 & 100\% & Regex-based Indian phone pattern \\
+Phone & 3 & 3 & 100 & Regex \\
 \hline
-NER Names & 3 & 2 & 67\% & Optional BERT NER; depends on OCR text \\
+NER Names & 3 & 2 & 67 & BERT \\
 \hline
-NER Address/Location & 3 & 1 & 33\% & Address format variation affects detection \\
+NER Address & 3 & 1 & 33 & Format \\
 \hline
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 Processing time reflected the early-exit design. Correctly oriented Aadhaar images were processed in 274--296 ms in the recorded tests. Harder cases took longer because the pipeline had to try more OCR variants.
@@ -153,28 +153,27 @@ Processing time reflected the early-exit design. Correctly oriented Aadhaar imag
 \end{figure}
 
 \begin{table}[htbp]
+\small
 \caption{Processing Time Results}
 \label{tab:timing_results}
 \centering
-\resizebox{\linewidth}{!}{
-\begin{tabular}{|l|c|c|c|p{4cm}|}
+\begin{tabular}{|l|c|c|c|p{2cm}|}
 \hline
-\textbf{Document} & \textbf{Type} & \textbf{Time (ms)} & \textbf{Detections} & \textbf{Notes} \\
+\textbf{Doc} & \textbf{Type} & \textbf{ms} & \textbf{Det} & \textbf{Notes} \\
 \hline
-Aadhaar-1 & PNG & 296 & 1 & Early exit after first OCR attempt \\
+Aadhaar-1 & PNG & 296 & 1 & First OCR \\
 \hline
-Aadhaar-2 & PNG & 274 & 1 & Early exit after first OCR attempt \\
+Aadhaar-2 & PNG & 274 & 1 & First OCR \\
 \hline
-Aadhaar-3 & PNG & 274 & 1 & Early exit after first OCR attempt \\
+Aadhaar-3 & PNG & 274 & 1 & First OCR \\
 \hline
-PAN-Card-1 & JPG & 1582 & 0 & OCR attempts completed without detection \\
+PAN-Card-1 & JPG & 1582 & 0 & No detect \\
 \hline
-Screenshot-Aadhaar & JPG & 304 & 1 & Slightly slower but still near target range \\
+Screenshot & JPG & 304 & 1 & Near target \\
 \hline
-Credit-Card-1 & PNG & 699 & 0 & Multiple OCR attempts required \\
+Credit-Card & PNG & 699 & 0 & Multiple \\
 \hline
 \end{tabular}
-}
 \end{table}
 
 \bigskip
@@ -207,44 +206,43 @@ The test cases cover expected inputs, negative cases, error handling, orientatio
 \caption{Test Case Execution Summary}
 \label{tab:test_cases}
 \centering
-\resizebox{\textwidth}{!}{
-\begin{tabular}{|l|p{4cm}|p{4cm}|p{4cm}|c|}
+\begin{tabular}{|l|c|l|c|p{2cm}|}
 \hline
-\textbf{Test Case} & \textbf{Input} & \textbf{Expected} & \textbf{Actual} & \textbf{Status} \\
+\textbf{TC} & \textbf{Input} & \textbf{Expected} & \textbf{Actual} & \textbf{Status} \\
 \hline
-TC-01 & Clear Aadhaar PNG & One Aadhaar detection & One Aadhaar detection & Pass \\
+TC-01 & Clear Aadhaar PNG & One Aadhaar detect. & One Aadhaar & Pass \\
 \hline
-TC-02 & Single-page PDF & Redaction applied to PDF output & Redaction applied & Pass \\
+TC-02 & Single-page PDF & Redaction applied & Redaction applied & Pass \\
 \hline
-TC-03 & Multiple PII types & All readable supported types detected & All expected readable types detected & Pass \\
+TC-03 & Multiple PII & All types detected & All types & Pass \\
 \hline
-TC-04 & Partial masking & First four characters masked & First four characters masked & Pass \\
+TC-04 & Partial masking & First 4 chars masked & First 4 chars & Pass \\
 \hline
-TC-05 & Full masking & All characters masked & All characters masked & Pass \\
+TC-05 & Full masking & All chars masked & All chars & Pass \\
 \hline
-TC-06 & No-PII document & Zero detections & Zero detections & Pass \\
+TC-06 & No-PII doc & Zero detections & Zero & Pass \\
 \hline
-TC-07 & Invalid Aadhaar & Rejected by Verhoeff validation & Rejected & Pass \\
+TC-07 & Invalid Aadhaar & Rejected & Rejected & Pass \\
 \hline
-TC-08 & Names/locations with NER enabled & NER detections where confidence is high & NER detections returned & Pass \\
+TC-08 & NER enabled & Detections returned & Detections & Pass \\
 \hline
-TC-09 & Word document & HTTP 400 unsupported file type & HTTP 400 & Pass \\
+TC-09 & Word doc & HTTP 400 & HTTP 400 & Pass \\
 \hline
-TC-10 & Invalid level & HTTP 400 invalid level & HTTP 400 & Pass \\
+TC-10 & Invalid level & HTTP 400 & HTTP 400 & Pass \\
 \hline
-TC-11 & Corrupted image & Processing error response & HTTP 500 & Pass \\
+TC-11 & Corrupted img & HTTP 500 & HTTP 500 & Pass \\
 \hline
-TC-12 & 90-degree rotated Aadhaar & Detection after orientation handling & Detection returned & Pass \\
+TC-12 & 90-deg rotated & Detection & Detection & Pass \\
 \hline
-TC-13 & 180-degree rotated Aadhaar & Detection after orientation handling & Detection returned & Pass \\
+TC-13 & 180-deg rotated & Detection & Detection & Pass \\
 \hline
-TC-14 & Upside-down Aadhaar & Detection after orientation handling & Detection returned & Pass \\
+TC-14 & Upside-down Aadhaar & Detection & Detection & Pass \\
 \hline
-TC-15 & Standard Aadhaar timing & Around or below 300 ms & 274--296 ms & Pass \\
+TC-15 & Std Aadhaar timing & Under 300 ms & 274-296 ms & Pass \\
 \hline
-TC-16 & Difficult orientation/no-detection case & Under 2000 ms & 1582 ms & Pass \\
+TC-16 & No-detection case & Under 2000 ms & 1582 ms & Pass \\
 \hline
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 The test set is not large enough to claim production-level accuracy. It does show that the implemented pipeline works as intended across the main feature paths.
@@ -259,31 +257,30 @@ NER adds substantial overhead when enabled. The model is preloaded at startup if
 
 Audit logging adds little overhead compared with OCR. It performs JSON serialization and SHA-256 hashing for one metadata entry per request.
 
-\begin{table*}[htbp]
+\begin{table}[htbp]
 \caption{Qualitative Comparison with Related Redaction Approaches}
 \label{tab:feature_comparison}
 \centering
-\resizebox{\textwidth}{!}{
 \begin{tabular}{|l|c|c|c|c|}
 \hline
-\textbf{Capability} & \textbf{RE-DACT} & \textbf{Adobe Acrobat Pro} & \textbf{Microsoft Presidio} & \textbf{Manual Redaction} \\
+\textbf{Capability} & \textbf{RE-DACT} & \textbf{Adobe} & \textbf{Presidio} & \textbf{Manual} \\
 \hline
-Aadhaar Verhoeff validation & Yes & No built-in Indian-specific flow & Custom recognizer required & Depends on reviewer \\
+Aadhaar Verhoeff & Yes & No & Custom & Depends \\
 \hline
-PAN structure validation & Yes & No built-in Indian-specific flow & Custom recognizer required & Depends on reviewer \\
+PAN validation & Yes & No & Custom & Depends \\
 \hline
-Payment card Luhn validation & Yes & Available through search/manual tools & Yes for credit-card recognizer & Depends on reviewer \\
+Payment Luhn & Yes & Yes & Yes & Depends \\
 \hline
-Multi-orientation OCR attempts & Yes & Not the focus of the tool & Not the core text analyzer's role & Reviewer dependent \\
+Multi-orientation OCR & Yes & No & No & Depends \\
 \hline
-Tamper-evident audit metadata & Basic hash chain & Product logging depends on setup & Not built in as a hash chain & Manual records only \\
+Audit metadata & Hash chain & Setup & No & Manual \\
 \hline
-Local web API & Yes & No & Yes as a framework & No \\
+Local Web API & Yes & No & Yes & No \\
 \hline
-No permanent document storage by default & Yes, short temporary TTL & Local file handling & Depends on integration & Depends on process \\
+No persistent storage & Yes (TTL) & Local & Depends & Depends \\
 \hline
-\end{tabular}}
-\end{table*}
+\end{tabular}
+\end{table}
 
 The comparison shows where RE-DACT is useful: local processing, Indian structured identifiers, and OCR-to-mask output. It is not a replacement for mature PDF editing suites or a full PII-detection platform. It is a focused prototype for a specific redaction workflow.
 
