@@ -6,6 +6,8 @@ from reportlab.lib.colors import HexColor
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from pypdf import PdfReader, PdfWriter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 
 # ── Band height in PDF points (1 pt = 1/72 inch). Adjust to taste. ──
@@ -32,6 +34,10 @@ IMG_BOTTOM_PADDING = 0
 # ── Vertical padding from page edges ──
 TOP_PAGE_PADDING = 10  # space from top edge → header band
 BOTTOM_PAGE_PADDING = 14  # space from bottom edge → footer band
+
+# ── Custom TTF font path ──
+FONT_PATH = "merddged.ttf"  # e.g. "./fonts/Inter-Regular.ttf"
+FONT_NAME = "CustomFont"
 
 # ── Image native aspect ratio (1392 × 417) ──
 IMG_ASPECT = 1392 / 417
@@ -77,11 +83,11 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
 
     # ── "Page X of Y – Left Label" ────────────────────────────────────
     left_label = config.get("left_label", "")
-    page_text = f"Page {page_num + 1} of {total_pages}"
+    page_text = f"Page {page_num + 2} of {total_pages}"
     if left_label:
         page_text += f"  -  {left_label}"
 
-    font = config.get("font", "Helvetica")
+    font = config.get("font", "Cantrell")
     font_size = config.get("font_size", 9)
     text_w = c.stringWidth(page_text, font, font_size)
     text_y = band_y + BAND_H / 2 - font_size / 2  # vertically centred in band
@@ -160,6 +166,11 @@ def stamp_pdf(input_path, output_path, config):
 #  CLI
 # ─────────────────────────────────────────────────────────────────────
 def main():
+    if FONT_PATH and Path(FONT_PATH).exists():
+        pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+    else:
+        print(f"[warn] Font not found at {FONT_PATH}, falling back to Helvetica")
+
     parser = argparse.ArgumentParser(
         description="Stamp identical header & footer bands onto every PDF page"
     )
@@ -187,6 +198,7 @@ def main():
         "bg_color": args.bg_color,
         "border_color": args.border_color,
         "text_color": args.text_color,
+        "font": FONT_NAME if FONT_PATH and Path(FONT_PATH).exists() else "Helvetica",
         "font_size": args.font_size,
     }
 
