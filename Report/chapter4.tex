@@ -113,6 +113,20 @@ NER Address/Location & 3 & 1 & 33\% & Address format variation affects detection
 
 Processing time reflected the early-exit design. Correctly oriented Aadhaar images were processed in 274--296 ms in the recorded tests. Harder cases took longer because the pipeline had to try more OCR variants.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{before_redaction_example.png}
+\caption{Before Redaction: Sample Document with Visible PII}
+\label{fig:before_redaction}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{after_redaction_exmaple.png}
+\caption{After Redaction: PII Masked with Standard Level}
+\label{fig:after_redaction}
+\end{figure}
+
 \begin{table}[htbp]
 \caption{Processing Time Results}
 \label{tab:timing_results}

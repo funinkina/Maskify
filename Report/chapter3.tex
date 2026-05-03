@@ -21,6 +21,20 @@ The implementation favors simple, inspectable components. Aadhaar and payment ca
 
 The application uses temporary directories for uploaded and processed files. When redaction succeeds, the result is stored in an in-memory dictionary and remains downloadable for ten minutes. The cleanup routine removes expired working directories during later upload requests. This is a short-retention design. It avoids permanent document storage, but it does not mean the document exists only in memory.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{upload_screen.png}
+\caption{RE-DACT Upload Interface}
+\label{fig:upload_interface}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{results_screen.png}
+\caption{RE-DACT Results Interface}
+\label{fig:results_interface}
+\end{figure}
+
 \section{PII Detection Module Design}
 
 The detection module is implemented in \texttt{detectors.py}. Each detector accepts a text string and returns a list of dictionaries with a common structure: type, value, start index, end index, length, and confidence. This shared output format lets the masking code treat detections consistently.
