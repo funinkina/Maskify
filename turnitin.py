@@ -21,13 +21,17 @@ IMG_TEXT_GAP = 10
 IMG_SCALE = 0.3
 
 # ── Center position for left-side image+text group (x coordinate) ──
-LEFT_CENTER_X = 140
+LEFT_CENTER_X = 110
 
 # ── Image vertical padding from the INNER edge of each band:
 #    IMG_TOP_PADDING    = distance (pts) from top of header band → top of image
 #    IMG_BOTTOM_PADDING = distance (pts) from bottom of footer band → bottom of image
-IMG_TOP_PADDING = 16
-IMG_BOTTOM_PADDING = 16
+IMG_TOP_PADDING = 18
+IMG_BOTTOM_PADDING = 0
+
+# ── Vertical padding from page edges ──
+TOP_PAGE_PADDING = 10  # space from top edge → header band
+BOTTOM_PAGE_PADDING = 14  # space from bottom edge → footer band
 
 # ── Image native aspect ratio (1392 × 417) ──
 IMG_ASPECT = 1392 / 417
@@ -120,8 +124,11 @@ def build_overlay_pdf(page_sizes, config):
 
     for i, (w, h) in enumerate(page_sizes):
         c.setPageSize((w, h))
-        draw_band(c, h - BAND_H, w, i + 1, total, config)  # header
-        draw_band(c, 0, w, i + 1, total, config)  # footer
+        # Header shifted down by TOP_PAGE_PADDING
+        draw_band(c, h - BAND_H - TOP_PAGE_PADDING, w, i + 1, total, config)
+
+        # Footer shifted up by BOTTOM_PAGE_PADDING
+        draw_band(c, BOTTOM_PAGE_PADDING, w, i + 1, total, config)
         c.showPage()
 
     c.save()
