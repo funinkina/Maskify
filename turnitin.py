@@ -29,10 +29,13 @@ from pypdf import PdfReader, PdfWriter
 BAND_H = 48
 
 # ── Horizontal padding from page edges ──
-PADDING = 10
+PADDING = 25
 
 # ── Gap between image and the page-number text ──
 IMG_TEXT_GAP = 10
+
+# ── Image scale factor (1.0 = original size) ──
+IMG_SCALE = 0.5
 
 # ── Image native aspect ratio (1392 × 417) ──
 IMG_ASPECT = 1392 / 417
@@ -56,7 +59,9 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
     if img_path and Path(img_path).exists():
         try:
             img = ImageReader(img_path)
-            img_h = BAND_H - 8  # leave 4 pt padding top & bottom
+            img_h = (
+                BAND_H - 20
+            ) * IMG_SCALE  # leave 10 pt padding top & bottom, scaled
             img_w = img_h * IMG_ASPECT
             img_x = PADDING
             img_y = band_y + (BAND_H - img_h) / 2
@@ -89,14 +94,6 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
     right_label = config.get("right_label", "")
     if right_label:
         c.drawRightString(width - PADDING, text_y, right_label)
-
-    # ── Optional border line ──────────────────────────────────────────
-    border = config.get("border_color")
-    if border:
-        c.setStrokeColor(HexColor(border))
-        c.setLineWidth(0.75)
-        line_y = band_y if band_y > 0 else band_y + BAND_H
-        c.line(0, line_y, width, line_y)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -164,7 +161,7 @@ def main():
         "--border-color", default="#cccccc", help="Inner border line color"
     )
     parser.add_argument("--text-color", default="#000000", help="Text color hex")
-    parser.add_argument("--font-size", default=9, type=int, help="Font size in points")
+    parser.add_argument("--font-size", default=6, type=int, help="Font size in points")
     args = parser.parse_args()
 
     config = {
