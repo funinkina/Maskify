@@ -17,10 +17,10 @@ BAND_H = 48
 PADDING = 25
 
 # ── Gap between image and the page-number text ──
-IMG_TEXT_GAP = 10
+IMG_TEXT_GAP = 14
 
 # ── Image scale factor (1.0 = original size) ──
-IMG_SCALE = 0.3
+IMG_SCALE = 0.35
 
 # ── Center position for left-side image+text group (x coordinate) ──
 LEFT_CENTER_X = 110
@@ -28,8 +28,8 @@ LEFT_CENTER_X = 110
 # ── Image vertical padding from the INNER edge of each band:
 #    IMG_TOP_PADDING    = distance (pts) from top of header band → top of image
 #    IMG_BOTTOM_PADDING = distance (pts) from bottom of footer band → bottom of image
-IMG_TOP_PADDING = 18
-IMG_BOTTOM_PADDING = 0
+IMG_TOP_PADDING = 16
+IMG_BOTTOM_PADDING = 2
 
 # ── Vertical padding from page edges ──
 TOP_PAGE_PADDING = 10  # space from top edge → header band
@@ -109,7 +109,7 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
         )
 
     # Draw page text
-    c.setFillColor(HexColor(config.get("text_color", "#000000")))
+    c.setFillColor(HexColor(config.get("text_color", "#141414")))
     c.setFont(font, font_size)
     text_x = group_start_x + img_w + (IMG_TEXT_GAP if img_w else 0)
     c.drawString(text_x, text_y, page_text)
