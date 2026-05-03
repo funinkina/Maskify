@@ -320,11 +320,11 @@ For image files, processing time depends on resolution and OCR quality. For PDFs
 
 \bigskip
 
-NER adds substantial overhead when enabled. The model is preloaded at startup if dependencies are available, which reduces first-request delay, but inference still takes longer than rule-based detection.
+OCR dominates processing time. The checksum and regex detectors run quickly compared with Tesseract. The early-exit design is therefore important: a normal upright image can complete after the first OCR pass, while a difficult image may require several attempts.
 
 \bigskip
 
-\section{Summary}
+For image files, processing time depends on resolution and OCR quality.
 
 The implementation translates the design into a working FastAPI application with a browser interface. The recorded tests show strong Aadhaar performance on clear inputs, more variable PAN/payment-card performance when OCR is challenged, and optional NER behavior that depends on text quality and model fit.
 

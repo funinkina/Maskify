@@ -75,6 +75,10 @@ The system implements zero-data-retention by design. Processed documents exist o
 
 \bigskip
 
+This approach ensures that sensitive documents are not persistently stored, reducing the risk of data breaches.
+
+\bigskip
+
 The project scope explicitly excludes certain advanced capabilities that could be added in future work. These include video redaction for moving images, batch processing for multiple documents simultaneously, advanced analytics on detection patterns, and integration with external verification services that could confirm identifier validity in real-time.
 
 The scope also excludes legal and compliance advice. The system provides technical redaction capability, but organizations must determine appropriate redaction levels and handling procedures based on their specific regulatory obligations. The audit logging provides evidence of processing but does not constitute legal compliance documentation.
@@ -113,7 +117,11 @@ The practical challenges of manual redaction include consistency across reviewer
 
 \bigskip
 
-The Aadhaar ecosystem illustrates the scale of the problem. Every time an Indian resident applies for a government service, opens a bank account, enrolls in an educational institution, or completes a financial transaction, their Aadhaar number may appear on supporting documentation. The UIDAI has issued over 1.3 billion Aadhaar numbers, making it one of the largest identity systems in the world. The widespread use of Aadhaar for authentication and verification across government and private sector services means that Aadhaar numbers frequently appear in documents throughout the Indian economy. Protecting these numbers during document handling is therefore a matter of widespread practical importance.
+The Aadhaar ecosystem illustrates the scale of the problem.
+
+\bigskip
+
+The motivation for RE-DACT comes from a simple problem: sensitive Indian identity data is easy to collect and hard to handle safely once it appears inside documents. Every time an Indian resident applies for a government service, opens a bank account, enrolls in an educational institution, or completes a financial transaction, their Aadhaar number may appear on supporting documentation. The UIDAI has issued over 1.3 billion Aadhaar numbers, making it one of the largest identity systems in the world. The widespread use of Aadhaar for authentication and verification across government and private sector services means that Aadhaar numbers frequently appear in documents throughout the Indian economy. Protecting these numbers during document handling is therefore a matter of widespread practical importance.
 
 The PAN system presents a similar challenge. The Income Tax Department issues PAN cards to facilitate tax administration, but the PAN has become a general-purpose identifier required for financial transactions, property purchases, business registrations, and numerous other purposes. Ten-character alphanumeric PAN numbers appear on documents including tax returns, financial statements, property registration records, business correspondence, and KYC documentation. The fixed structure of PAN numbers makes them identifiable through pattern matching, but the absence of a checksum requires alternative validation approaches.
 

@@ -122,11 +122,19 @@ The core achievements of this project demonstrate the feasibility of building pr
 
 The validation algorithms represent the strongest technical contribution. The Verhoeff implementation for Aadhaar and the Luhn implementation for payment cards provide mathematical certainty about candidate validity that regex-based systems cannot achieve. The PAN holder-type validation adds semantic filtering beyond simple structural matching. These algorithms are efficient enough to run on every candidate without significant performance impact.
 
+\bigskip
+
+The processing pipeline handles the practical challenges of real documents.
+
 The processing pipeline handles the practical challenges of real documents. Rotation, skew, noise, and varying quality all affect OCR accuracy. The eight-attempt orientation strategy ensures that the system finds text regardless of document orientation, while the early-exit optimization keeps fast cases quick. This balance between thoroughness and performance is essential for practical deployment.
 
 \bigskip
 
 The limitations of the current implementation provide direction for future work. OCR quality remains the primary bottleneck for challenging documents. The system does not handle documents with multiple pages efficiently because each page is processed sequentially. The audit logging maintains continuity only within a single process run. These limitations are understood and documented, which enables organizations to make informed decisions about deployment.
+
+\bigskip
+
+The project demonstrates that effective document processing systems can be built from established open-source components without requiring proprietary software or specialized infrastructure.
 
 The project demonstrates that effective document processing systems can be built from established open-source components without requiring proprietary software or specialized infrastructure. This accessibility enables adoption by organizations that cannot afford commercial licensing or that have policies against sending sensitive documents to external services. The modular architecture allows individual components to be upgraded as technology improves.
 

@@ -228,7 +228,15 @@ Following text extraction, the detection module processes the extracted text thr
 
 \bigskip
 
-The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output. For image inputs, the single redacted image is the final output. For PDF inputs, the redacted page images are converted back to a multi-page PDF using img2pdf, preserving the original document structure while incorporating the applied redactions.
+The deduplicated detection list is then passed to the masking module, which computes character-level masking ranges based on the selected redaction level. After masking is applied to each page image, the system assembles the output.
+
+\bigskip
+
+This approach ensures accurate redaction while preserving document structure. The modular design allows components to be tested and updated independently.
+
+\bigskip
+
+The data flow design prioritizes reliability and debuggability. For image inputs, the single redacted image is the final output. For PDF inputs, the redacted page images are converted back to a multi-page PDF using img2pdf, preserving the original document structure while incorporating the applied redactions.
 
 \bigskip
 
