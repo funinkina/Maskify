@@ -83,7 +83,7 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
 
     # ── "Page X of Y – Left Label" ────────────────────────────────────
     left_label = config.get("left_label", "")
-    page_text = f"Page {page_num + 2} of {total_pages}"
+    page_text = f"Page {page_num + 2} of {total_pages + 2}"
     if left_label:
         page_text += f" - {left_label}"
 
