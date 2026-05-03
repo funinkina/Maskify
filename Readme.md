@@ -171,3 +171,64 @@ Maskify/
 - Optimized for standard Aadhaar card formats
 - Requires clear, readable text for accurate OCR
 - Processing time varies based on image quality and resolution
+
+## Building the Report
+
+The project report is written in LaTeX and can be compiled to PDF using XeLaTeX.
+
+### Prerequisites
+
+- XeLaTeX (part of TeX Live or MacTeX)
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y texlive-xetex
+```
+
+#### Linux (Fedora/RHEL)
+
+```bash
+sudo dnf install -y texlive-xetex
+```
+
+#### Windows
+
+1. Download and install [TeX Live](https://www.tiug.org/Software/tl/install/) or [MiKTeX](https://miktex.org/)
+2. During installation, ensure XeLaTeX is selected
+3. Add the TeX bin directory to your system PATH
+
+### Compilation
+
+To compile the report, navigate to the `Report` directory and run:
+
+```bash
+cd Report
+xelatex -interaction=nonstopmode main.tex
+```
+
+Run the command twice to ensure all cross-references, citations, and table of contents are resolved correctly:
+
+```bash
+xelatex -interaction=nonstopmode main.tex
+xelatex -interaction=nonstopmode main.tex
+```
+
+The compiled PDF will be generated as `main.pdf` in the Report directory.
+
+### Report Structure
+
+```
+Report/
+├── main.tex              # Main document
+├── chapter1.tex          # Introduction
+├── chapter2.tex          # Literature Review
+├── chapter3.tex          # System Design
+├── chapter4.tex          # Implementation
+├── chapter5.tex          # Conclusion
+├── abstract.tex          # Abstract
+├── cover.tex             # Cover page
+├── references.bib        # Bibliography
+└── main.pdf              # Compiled output
+```
