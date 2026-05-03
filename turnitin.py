@@ -35,7 +35,14 @@ PADDING = 25
 IMG_TEXT_GAP = 10
 
 # ── Image scale factor (1.0 = original size) ──
-IMG_SCALE = 0.5
+IMG_SCALE = 0.3
+
+# ── Center position for left-side image+text group (x coordinate) ──
+LEFT_CENTER_X = 140
+
+# ── Image vertical padding (top for header, bottom for footer) ──
+IMG_TOP_PADDING = -10
+IMG_BOTTOM_PADDING = 8
 
 # ── Image native aspect ratio (1392 × 417) ──
 IMG_ASPECT = 1392 / 417
@@ -55,25 +62,19 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
 
     # ── Image (left side) ────────────────────────────────────────────
     img_w = 0
+    img_h = 0
     img_path = config.get("image", "")
     if img_path and Path(img_path).exists():
         try:
             img = ImageReader(img_path)
-            img_h = (
-                BAND_H - 20
-            ) * IMG_SCALE  # leave 10 pt padding top & bottom, scaled
+            # Use top padding for header (band_y > 0), bottom padding for footer (band_y == 0)
+            if band_y > 0:
+                img_h = BAND_H * IMG_SCALE
+                img_y = band_y + IMG_TOP_PADDING
+            else:
+                img_h = BAND_H * IMG_SCALE
+                img_y = band_y + IMG_BOTTOM_PADDING
             img_w = img_h * IMG_ASPECT
-            img_x = PADDING
-            img_y = band_y + (BAND_H - img_h) / 2
-            c.drawImage(
-                img,
-                img_x,
-                img_y,
-                width=img_w,
-                height=img_h,
-                preserveAspectRatio=True,
-                mask="auto",
-            )
         except Exception as e:
             print(f"  [warn] Could not draw image: {e}")
 
@@ -88,6 +89,30 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
 
     c.setFillColor(HexColor(config.get("text_color", "#000000")))
     c.setFont(config.get("font", "Helvetica"), config.get("font_size", 9))
+    text_w = c.stringWidth(
+        page_text, config.get("font", "Helvetica"), config.get("font_size", 9)
+    )
+
+    # ── Center image+text group at LEFT_CENTER_X ─────────────────────
+    total_w = img_w + IMG_TEXT_GAP + text_w
+    group_start_x = LEFT_CENTER_X - total_w / 2
+
+    # Draw image at start of group
+    if img_w > 0 and img_h > 0 and img_path and Path(img_path).exists():
+        img_x = group_start_x
+        c.drawImage(
+            img,
+            img_x,
+            img_y,
+            width=img_w,
+            height=img_h,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+
+    # Draw text after image
+    text_x = group_start_x + img_w + IMG_TEXT_GAP
+    text_y = band_y + BAND_H / 2 - 5  # vertically centred
     c.drawString(text_x, text_y, page_text)
 
     # ── Right label ───────────────────────────────────────────────────
