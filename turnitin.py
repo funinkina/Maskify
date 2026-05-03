@@ -36,7 +36,7 @@ TOP_PAGE_PADDING = 10  # space from top edge → header band
 BOTTOM_PAGE_PADDING = 14  # space from bottom edge → footer band
 
 # ── Custom TTF font path ──
-FONT_PATH = "merddged.ttf"  # e.g. "./fonts/Inter-Regular.ttf"
+FONT_PATH = "/home/funinkina/Downloads/Noto_Sans/NotoSans-VariableFont_wdth,wght.ttf"  # e.g. "./fonts/Inter-Regular.ttf"
 FONT_NAME = "CustomFont"
 
 # ── Image native aspect ratio (1392 × 417) ──
@@ -85,9 +85,9 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
     left_label = config.get("left_label", "")
     page_text = f"Page {page_num + 2} of {total_pages}"
     if left_label:
-        page_text += f"  -  {left_label}"
+        page_text += f" - {left_label}"
 
-    font = config.get("font", "Cantrell")
+    font = config.get("font", "Noto Sans")
     font_size = config.get("font_size", 9)
     text_w = c.stringWidth(page_text, font, font_size)
     text_y = band_y + BAND_H / 2 - font_size / 2  # vertically centred in band
