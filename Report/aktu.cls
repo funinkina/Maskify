@@ -477,12 +477,12 @@ reserved.\par\permission}}
 \choosecase{\bigsize \textbf{Computer Science and Engineering-AIML}}
 \par
 \size\textbf{by} \par
-\choosecase{\bigsize\textbf{Tanish Rastogi}}
-\choosecase{\normal(\textbf{2300911539012) }}\par
 \choosecase{\bigsize\textbf{Mahima Gupta}}
 \choosecase{\normal(\textbf{2200911530064) }}\par
 \choosecase{\bigsize\textbf{Aryan Kushwaha}}
 \choosecase{\normal(\textbf{2200911530028) }}\par
+\choosecase{\bigsize\textbf{Tanish Rastogi}}
+\choosecase{\normal(\textbf{2300911539012) }}\par
 \choosecase{\normal\textbf{Under the Supervision of}}
 \par
 \choosecase{\size\textbf{Mrs. Puja Thakur}}
