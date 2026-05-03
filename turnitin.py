@@ -1,20 +1,3 @@
-"""
-PDF Header & Footer Overlay Tool
----------------------------------
-Stamps an identical header and footer onto every page of an existing PDF
-without modifying the original content.
-
-Layout (same for header and footer):
-  LEFT:  [Image 1392x417] <gap> Page X of Y - Left Label
-  RIGHT: Right Label
-
-Usage:
-    python add_header_footer.py input.pdf output.pdf \
-        --image logo.png \
-        --left-label "Document Name" \
-        --right-label "Confidential"
-"""
-
 import argparse
 import io
 from pathlib import Path
@@ -40,9 +23,11 @@ IMG_SCALE = 0.3
 # ── Center position for left-side image+text group (x coordinate) ──
 LEFT_CENTER_X = 140
 
-# ── Image vertical padding (top for header, bottom for footer) ──
-IMG_TOP_PADDING = -10
-IMG_BOTTOM_PADDING = 8
+# ── Image vertical padding from the INNER edge of each band:
+#    IMG_TOP_PADDING    = distance (pts) from top of header band → top of image
+#    IMG_BOTTOM_PADDING = distance (pts) from bottom of footer band → bottom of image
+IMG_TOP_PADDING = 16
+IMG_BOTTOM_PADDING = 16
 
 # ── Image native aspect ratio (1392 × 417) ──
 IMG_ASPECT = 1392 / 417
@@ -52,7 +37,9 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
     """
     Draws one header/footer band.
     band_y = bottom-left Y coordinate of the band rectangle.
+    is_header = band_y > 0
     """
+    is_header = band_y > 0
 
     # ── Optional background ──────────────────────────────────────────
     bg = config.get("bg_color")
@@ -60,49 +47,50 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
         c.setFillColor(HexColor(bg))
         c.rect(0, band_y, width, BAND_H, fill=1, stroke=0)
 
-    # ── Image (left side) ────────────────────────────────────────────
+    # ── Image geometry ────────────────────────────────────────────────
     img_w = 0
     img_h = 0
+    img_y = band_y  # fallback; overwritten below
+    img_reader = None
+
     img_path = config.get("image", "")
     if img_path and Path(img_path).exists():
         try:
-            img = ImageReader(img_path)
-            # Use top padding for header (band_y > 0), bottom padding for footer (band_y == 0)
-            if band_y > 0:
-                img_h = BAND_H * IMG_SCALE
-                img_y = band_y + IMG_TOP_PADDING
-            else:
-                img_h = BAND_H * IMG_SCALE
-                img_y = band_y + IMG_BOTTOM_PADDING
+            img_reader = ImageReader(img_path)
+            img_h = BAND_H * IMG_SCALE
             img_w = img_h * IMG_ASPECT
+
+            if is_header:
+                # Anchor to TOP of band, then step down by IMG_TOP_PADDING
+                band_top = band_y + BAND_H
+                img_y = band_top - IMG_TOP_PADDING - img_h
+            else:
+                # Anchor to BOTTOM of band, then step up by IMG_BOTTOM_PADDING
+                img_y = band_y + IMG_BOTTOM_PADDING
+
         except Exception as e:
-            print(f"  [warn] Could not draw image: {e}")
+            print(f"  [warn] Could not load image: {e}")
 
-    # ── "Page X of Y – Left Label" (after the image) ─────────────────
-    text_x = PADDING + img_w + IMG_TEXT_GAP
-    text_y = band_y + BAND_H / 2 - 5  # vertically centred
-
+    # ── "Page X of Y – Left Label" ────────────────────────────────────
     left_label = config.get("left_label", "")
     page_text = f"Page {page_num + 1} of {total_pages}"
     if left_label:
         page_text += f"  -  {left_label}"
 
-    c.setFillColor(HexColor(config.get("text_color", "#000000")))
-    c.setFont(config.get("font", "Helvetica"), config.get("font_size", 9))
-    text_w = c.stringWidth(
-        page_text, config.get("font", "Helvetica"), config.get("font_size", 9)
-    )
+    font = config.get("font", "Helvetica")
+    font_size = config.get("font_size", 9)
+    text_w = c.stringWidth(page_text, font, font_size)
+    text_y = band_y + BAND_H / 2 - font_size / 2  # vertically centred in band
 
-    # ── Center image+text group at LEFT_CENTER_X ─────────────────────
-    total_w = img_w + IMG_TEXT_GAP + text_w
-    group_start_x = LEFT_CENTER_X - total_w / 2
+    # ── Centre image+text group at LEFT_CENTER_X ─────────────────────
+    total_group_w = img_w + (IMG_TEXT_GAP if img_w else 0) + text_w
+    group_start_x = LEFT_CENTER_X - total_group_w / 2
 
-    # Draw image at start of group
-    if img_w > 0 and img_h > 0 and img_path and Path(img_path).exists():
-        img_x = group_start_x
+    # Draw image
+    if img_reader is not None and img_w > 0:
         c.drawImage(
-            img,
-            img_x,
+            img_reader,
+            group_start_x,
             img_y,
             width=img_w,
             height=img_h,
@@ -110,9 +98,10 @@ def draw_band(c, band_y, width, page_num, total_pages, config):
             mask="auto",
         )
 
-    # Draw text after image
-    text_x = group_start_x + img_w + IMG_TEXT_GAP
-    text_y = band_y + BAND_H / 2 - 5  # vertically centred
+    # Draw page text
+    c.setFillColor(HexColor(config.get("text_color", "#000000")))
+    c.setFont(font, font_size)
+    text_x = group_start_x + img_w + (IMG_TEXT_GAP if img_w else 0)
     c.drawString(text_x, text_y, page_text)
 
     # ── Right label ───────────────────────────────────────────────────
@@ -131,13 +120,8 @@ def build_overlay_pdf(page_sizes, config):
 
     for i, (w, h) in enumerate(page_sizes):
         c.setPageSize((w, h))
-
-        # Header band — anchored to top
-        draw_band(c, h - BAND_H, w, i + 1, total, config)
-
-        # Footer band — anchored to bottom
-        draw_band(c, 0, w, i + 1, total, config)
-
+        draw_band(c, h - BAND_H, w, i + 1, total, config)  # header
+        draw_band(c, 0, w, i + 1, total, config)  # footer
         c.showPage()
 
     c.save()
